@@ -1,0 +1,14 @@
+package org.opennms.netmgt.alarmd;
+
+import org.opennms.netmgt.model.OnmsAlarm;
+import org.opennms.netmgt.model.OnmsSeverity;
+
+global org.opennms.netmgt.alarmd.AlarmLifecyleManager alarmLifecyleManager;
+
+rule "cosmicClear"
+  when
+    $clear : OnmsAlarm(alarmType == 2)
+    $trigger : OnmsAlarm(alarmType == 1, severity.isGreaterThanOrEqual(OnmsSeverity.NORMAL), reductionKey == $clear.clearKey, lastEventTime < $clear.lastEventTime)
+  then
+    alarmLifecyleManager.clearAlarm($trigger);
+end

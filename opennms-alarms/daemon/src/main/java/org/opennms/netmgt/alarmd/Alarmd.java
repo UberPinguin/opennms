@@ -30,18 +30,13 @@ package org.opennms.netmgt.alarmd;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.opennms.netmgt.alarmd.api.NorthboundAlarm;
 import org.opennms.netmgt.alarmd.api.Northbounder;
 import org.opennms.netmgt.alarmd.api.NorthbounderException;
-import org.opennms.netmgt.daemon.SpringServiceDaemon;
+import org.opennms.netmgt.daemon.AbstractServiceDaemon;
 import org.opennms.netmgt.events.api.EventConstants;
 import org.opennms.netmgt.events.api.EventProxy;
 import org.opennms.netmgt.events.api.EventProxyException;
@@ -54,20 +49,17 @@ import org.opennms.netmgt.xml.event.Event;
 import org.opennms.netmgt.xml.event.Parm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 /**
  * Alarm management Daemon
  *
- * TODO: Change this class to use AbstractServiceDaemon instead of SpringServiceDaemon
- *
+ * @author jwhite
  * @author <a href="mailto:david@opennms.org">David Hustace</a>
- * @version $Id: $
  */
 @EventListener(name=Alarmd.NAME, logPrefix="alarmd")
-public class Alarmd implements SpringServiceDaemon, ThreadAwareEventListener {
+public class Alarmd extends AbstractServiceDaemon implements ThreadAwareEventListener {
     private static final Logger LOG = LoggerFactory.getLogger(Alarmd.class);
 
     /** Constant <code>NAME="Alarmd"</code> */
@@ -85,6 +77,10 @@ public class Alarmd implements SpringServiceDaemon, ThreadAwareEventListener {
     @Autowired
     @Qualifier("eventProxy")
     private EventProxy m_eventProxy;
+
+    public Alarmd() {
+        super(NAME);
+    }
 
     /**
      * Listens for all events.
@@ -189,27 +185,13 @@ public class Alarmd implements SpringServiceDaemon, ThreadAwareEventListener {
         return m_persister;
     }
 
-    /**
-     * <p>getName</p>
-     *
-     * @return a {@link java.lang.String} object.
-     */
-    public String getName() {
-        return NAME;
-    }
-
     @Override
-    public void start() {
+    protected synchronized void onInit() {
         // pass
     }
 
     @Override
-    public void afterPropertiesSet()  {
-        // pass
-    }
-
-    @Override
-    public synchronized void destroy() {
+    public synchronized void onStop() {
         // On shutdown, stop all of the NBIs
         m_northboundInterfaces.forEach(nb -> {
             LOG.debug("destroy: stopping {}", nb.getName());

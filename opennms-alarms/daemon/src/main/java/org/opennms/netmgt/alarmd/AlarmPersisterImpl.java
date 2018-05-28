@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 
 import org.hibernate.Hibernate;
@@ -47,6 +48,7 @@ import org.opennms.netmgt.model.OnmsSeverity;
 import org.opennms.netmgt.model.events.EventBuilder;
 import org.opennms.netmgt.xml.event.Event;
 import org.opennms.netmgt.xml.event.UpdateField;
+import org.opennms.netmgt.xml.eventconf.LogDestType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionOperations;
@@ -94,6 +96,7 @@ public class AlarmPersisterImpl implements AlarmPersister {
      * @return */
     @Override
     public OnmsAlarm persist(Event event, boolean eagerlyLoadAlarm) {
+        Objects.requireNonNull(event, "Cannot create alarm from null event.");
         if (!checkEventSanityAndDoWeProcess(event)) {
             return null;
         }
@@ -122,9 +125,10 @@ public class AlarmPersisterImpl implements AlarmPersister {
     }
 
     private OnmsAlarmAndLifecycleEvent addOrReduceEventAsAlarm(Event event, boolean eagerlyLoadAlarm) {
-        // 2012-03-11 pbrane: for some reason when we get here the event from the DB doesn't have the LogMsg (in my tests anyway)
-        OnmsEvent e = m_eventDao.get(event.getDbid());
-        Assert.notNull(e, "Event was deleted before we could retrieve it and create an alarm.");
+        final OnmsEvent e = m_eventDao.get(event.getDbid());
+        if (e == null) {
+            throw new IllegalStateException("Event with id " + event.getDbid() + " was deleted before we could retrieve it and create an alarm.");
+        }
 
         final String reductionKey = event.getAlarmData().getReductionKey();
         LOG.debug("addOrReduceEventAsAlarm: looking for existing reduction key: {}", reductionKey);
@@ -137,7 +141,6 @@ public class AlarmPersisterImpl implements AlarmPersister {
             }
             alarm = createNewAlarm(e, event);
 
-            //FIXME: this should be a cascaded save
             m_alarmDao.save(alarm);
             m_eventDao.saveOrUpdate(e);
 
@@ -190,7 +193,7 @@ public class AlarmPersisterImpl implements AlarmPersister {
                 String fieldName = field.getFieldName();
 
                 //Always set these, unless specified not to, in order to maintain current behavior
-                if (fieldName.equalsIgnoreCase("LogMsg") && field.isUpdateOnReduction() == false) {
+                if (fieldName.equalsIgnoreCase("LogMsg") && !field.isUpdateOnReduction()) {
                     continue;
                 } else {
                     alarm.setLogMsg(e.getEventLogMsg());
@@ -248,18 +251,6 @@ public class AlarmPersisterImpl implements AlarmPersister {
                 } else {
                     LOG.warn("reduceEvent: The specified field: {}, is not supported.", fieldName);
                 }
-
-                /* This doesn't work because the properties are not consistent from OnmsEvent to OnmsAlarm
-                    try {
-                        final BeanWrapper ew = PropertyAccessorFactory.forBeanPropertyAccess(e);
-                        final BeanWrapper aw = PropertyAccessorFactory.forBeanPropertyAccess(alarm);
-                        aw.setPropertyValue(fieldName, ew.getPropertyValue(fieldName));
-                    } catch (BeansException be) {                        
-                        LOG.error("reduceEvent", be);
-                        continue;
-                    }
-                 */
-
             }
         }
 
@@ -284,27 +275,22 @@ public class AlarmPersisterImpl implements AlarmPersister {
         alarm.setOperInstruct(e.getEventOperInstruct());
         alarm.setReductionKey(event.getAlarmData().getReductionKey());
         alarm.setServiceType(e.getServiceType());
-        alarm.setSeverity(OnmsSeverity.get(e.getEventSeverity())); //TODO: what to do?
-        alarm.setSuppressedUntil(e.getEventTime()); //TODO: fix UI to not require this be set
-        alarm.setSuppressedTime(e.getEventTime()); //TODO: Fix UI to not require this be set
-        //alarm.setTTicketId(e.getEventTTicket());
-        //alarm.setTTicketState(TroubleTicketState.CANCEL_FAILED);  //FIXME
+        alarm.setSeverity(OnmsSeverity.get(e.getEventSeverity()));
+        alarm.setSuppressedUntil(e.getEventTime()); //UI requires this be set
+        alarm.setSuppressedTime(e.getEventTime()); // UI requires this be set
         alarm.setUei(e.getEventUei());
         e.setAlarm(alarm);
         return alarm;
     }
-    
-    private static boolean checkEventSanityAndDoWeProcess(final Event event) {
-        // 2009-01-07 pbrane: TODO: Understand why we use Assert
-        Assert.notNull(event, "Incoming event was null, aborting"); 
 
-        if (event.getLogmsg() != null && "donotpersist".equals(event.getLogmsg().getDest())) {
+    private static boolean checkEventSanityAndDoWeProcess(final Event event) {
+        if (event.getLogmsg() != null && LogDestType.DONOTPERSIST.toString().equalsIgnoreCase(event.getLogmsg().getDest())) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("checkEventSanity: uei '{}' marked as 'donotpersist'; not processing event.", event.getUei());
+                LOG.debug("checkEventSanity: uei '{}' marked as '{}'; not processing event.", event.getUei(), LogDestType.DONOTPERSIST);
             }
             return false;
         }
-        
+
         if (event.getAlarmData() == null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("checkEventSanity: uei '{}' has no alarm data; not processing event.", event.getUei());
@@ -312,8 +298,9 @@ public class AlarmPersisterImpl implements AlarmPersister {
             return false;
         }
 
-        // 2009-01-07 pbrane: TODO: Understand why we use Assert
-        Assert.isTrue(event.getDbid() > 0, "Incoming event has an illegal dbid (" + event.getDbid() + "), aborting");
+        if (event.getDbid() <= 0) {
+            throw new IllegalStateException("Incoming event has an illegal dbid (" + event.getDbid() + "), aborting");
+        }
 
         return true;
     }

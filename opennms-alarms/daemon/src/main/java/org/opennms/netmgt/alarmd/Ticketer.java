@@ -38,4 +38,6 @@ public interface Ticketer {
 
     void updateTicket(OnmsAlarm alarm);
 
+    void closeTicket(OnmsAlarm alarm);
+
 }

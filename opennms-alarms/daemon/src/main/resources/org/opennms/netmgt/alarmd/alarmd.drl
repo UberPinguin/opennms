@@ -69,6 +69,40 @@ rule "unclear"
 end
 
 /*
+TODO:
+    <automation name="escalation" interval="30000" active="false"
+                trigger-name="selectSuspectAlarms"
+                action-name="escalateAlarm"
+                action-event="sendAlarmEscalatedEvent" />
+    <trigger name="selectSuspectAlarms" operator="&gt;=" row-count="1" >
+      <statement>
+          SELECT a.alarmid AS _alarmid,
+                 a.eventuei AS _eventuei,
+                 a.nodeid AS _nodeid,
+                 a.ipaddr AS _ipaddr,
+                 a.serviceid AS _serviceid,
+                 s.servicename AS _servicename,
+                 now() AS _ts
+            FROM alarms a
+ LEFT OUTER JOIN service s
+              ON s.serviceid = a.serviceid
+           WHERE ( a.alarmType = 1 OR a.alarmType = 3 )
+             AND severity &gt; 3
+             AND severity &lt; 7
+             AND alarmacktime IS NULL
+             AND COALESCE(lastautomationtime, lasteventtime) &lt; now() - interval '60 minutes'
+      </statement>
+    </trigger>
+    <action name="escalateAlarm" >
+      <statement>
+        UPDATE alarms
+           SET alarmAckUser = null, alarmAckTime = null, severity = severity +1, firstautomationtime = COALESCE(firstautomationtime, ${_ts}), lastautomationtime = ${_ts}
+         WHERE alarmid = ${_alarmid}
+      </statement>
+    </action>
+*/
+
+/*
    <automation name="cleanUp" interval="60000" active="true"
                 trigger-name="selectPastClearedAlarmsToDelete"
                 action-name="deleteAlarms"
@@ -296,6 +330,79 @@ rule "updateTickets"
     $alarm : OnmsAlarm(severity.isGreaterThan(OnmsSeverity.CLEARED) &&
                        (alarmType == 1 || alarmType == 3) &&
                        TTicketState != null)
+    // FIXME: not( OnmsAlarm( this == $alarm ) over window:time( 15m ) )
   then
     alarmLifecyleManager.updateTicket($alarm);
+end
+
+/*
+    <automation name="closeClearedAlarmTickets" interval="60000" active="false"
+                trigger-name="selectClearedAlarmWithOpenTicketState"
+                action-name="updateAutomationTime"
+                action-event="closeTicket" />
+    <!-- Find Alarms that have cleared and have an open ticket state (Only works with PostgreSQL 8.1 or better) -->
+    <trigger name="selectClearedAlarmWithOpenTicketState" operator="&gt;=" row-count="1" >
+      <statement>
+          SELECT a.alarmid AS _alarmid,
+                 a.eventuei AS _eventuei,
+                 'admin' AS _user,
+                 a.tticketID AS _tticketID,
+                 now() AS _ts
+            FROM alarms a
+           WHERE a.severity = 2
+             AND a.alarmType = 1
+             AND a.tticketState = 0
+             AND GREATEST(lastautomationtime, lasteventtime) &lt; now() - interval '15 minutes'
+      </statement>
+    </trigger>
+    <action-event name="closeTicket" for-each-result="true" >
+      <assignment type="field" name="uei" value="uei.opennms.org/troubleTicket/close" />
+      <assignment type="parameter" name="alarmUei" value="${_eventuei}" />
+      <assignment type="parameter" name="user" value="${_user}" />
+      <assignment type="parameter" name="alarmId" value="${_alarmid}" />
+      <assignment type="parameter" name="troubleTicket" value="${_tticketID}" />
+    </action-event>
+*/
+rule "closeClearedAlarmTickets"
+  when
+    Ticketer(isEnabled() == true)
+    $alarm : OnmsAlarm(severity == OnmsSeverity.CLEARED &&
+                       alarmType == 1 &&
+                       TTicketState == TroubleTicketState.OPEN)
+     // FIXME: not( OnmsAlarm( this == $alarm ) over window:time( 15m ) )
+  then
+    alarmLifecyleManager.closeTicket($alarm);
+end
+
+/*  <automation name="clearAlarmsForClosedTickets" interval="60000" active="false"
+                  trigger-name="selectClosedTicketStateForProblemAlarms"
+                  action-name="clearClosedTicketAlarms" />
+    <!-- Find Alarms that have a closed ticket state that haven't been cleared, yet. State 5 is closed. -->
+    <trigger name="selectClosedTicketStateForProblemAlarms" operator="&gt;=" row-count="1" >
+      <statement>
+          SELECT a.alarmid AS _alarmid, a.eventuei AS _eventUei, e.eventseverity AS _sev, now() AS _ts
+                 now() AS _ts
+            FROM alarms a
+           WHERE a.tticketstate = 5
+             AND a.severity &gt; 2
+             AND ( a.alarmType = 1 OR a.alarmType = 3 )
+      </statement>
+    </trigger>
+   <!--  clear alarms that have a trouble ticket assigned as closed and alarm has not cleared-->
+    <action name="clearClosedTicketAlarms" >
+      <statement>
+        UPDATE alarms
+           SET severity=2, firstautomationtime = COALESCE(firstautomationtime, ${_ts}), lastautomationtime = ${_ts}
+         WHERE alarmid = ${_alarmid}
+      </statement>
+    </action>
+*/
+rule "clearAlarmsForClosedTickets"
+  when
+    Ticketer(isEnabled() == true)
+    $alarm : OnmsAlarm(severity.isGreaterThan(OnmsSeverity.CLEARED) &&
+                       (alarmType == 1 || alarmType == 3) &&
+                       TTicketState == TroubleTicketState.CLOSED)
+  then
+    alarmLifecyleManager.clearAlarm($alarm);
 end

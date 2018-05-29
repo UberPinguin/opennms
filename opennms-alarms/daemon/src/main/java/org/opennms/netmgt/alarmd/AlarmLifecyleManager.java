@@ -133,6 +133,10 @@ public class AlarmLifecyleManager {
         ticketer.updateTicket(alarm);
     }
 
+    public void closeTicket(OnmsAlarm alarm) {
+        ticketer.closeTicket(alarm);
+    }
+
     public SessionPseudoClock getClock() {
         return clock;
     }
@@ -140,4 +144,6 @@ public class AlarmLifecyleManager {
     public void tick() {
         kieSession.fireAllRules();
     }
+
+
 }

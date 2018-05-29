@@ -58,6 +58,7 @@ import org.opennms.netmgt.dao.api.AlarmDao;
 import org.opennms.netmgt.model.OnmsAlarm;
 import org.opennms.netmgt.model.OnmsEvent;
 import org.opennms.netmgt.model.OnmsSeverity;
+import org.opennms.netmgt.model.TroubleTicketState;
 
 public class AlarmLifecycleDroolsIT {
 
@@ -344,9 +345,78 @@ public class AlarmLifecycleDroolsIT {
         */
     }
 
+    @Test
+    public void canClose() {
+        ticketer.setEnabled(true);
+
+        // Trigger some problem
+        OnmsAlarm trigger = new OnmsAlarm();
+        trigger.setId(1);
+        trigger.setAlarmType(1);
+        trigger.setSeverity(OnmsSeverity.WARNING);
+        trigger.setReductionKey("n1:oops");
+        trigger.setLastEventTime(new Date(100));
+        alm.onAlarm(trigger);
+
+        // No ticket yet
+        assertThat(ticketer.getCreates(), hasSize(0));
+
+        // Advance the clock and tick
+        alm.getClock().advanceTime( 20, TimeUnit.MINUTES );
+        alm.tick();
+
+        // Ticket!
+        assertThat(ticketer.getCreates(), contains(trigger.getId()));
+
+        // "Open" the ticket
+        trigger.setTTicketState(TroubleTicketState.OPEN);
+        alm.onAlarm(trigger);
+
+        // Inject a clear
+        OnmsAlarm clear = new OnmsAlarm();
+        clear.setId(2);
+        clear.setAlarmType(2);
+        clear.setSeverity(OnmsSeverity.CLEARED);
+        clear.setClearKey("n1:oops");
+        clear.setLastEventTime(new Date(101));
+        alm.onAlarm(clear);
+
+        // The trigger should be cleared
+        assertThat(trigger.getSeverity(), equalTo(OnmsSeverity.CLEARED));
+
+        // Advance the clock and tick
+        alm.getClock().advanceTime( 20, TimeUnit.MINUTES );
+        alm.tick();
+
+        // Ticket closed!
+        assertThat(ticketer.getCloses(), contains(trigger.getId()));
+    }
+
+    @Test
+    public void canClearAlarmForClosedTicket() {
+        ticketer.setEnabled(true);
+
+        // Trigger some problem
+        OnmsAlarm trigger = new OnmsAlarm();
+        trigger.setId(1);
+        trigger.setAlarmType(1);
+        trigger.setSeverity(OnmsSeverity.WARNING);
+        trigger.setReductionKey("n1:oops");
+        trigger.setLastEventTime(new Date(100));
+        // Pretend there is a closed ticket associated with this alarm
+        trigger.setTTicketState(TroubleTicketState.CLOSED);
+        alm.onAlarm(trigger);
+
+        // The trigger should be cleared
+        assertThat(trigger.getSeverity(), equalTo(OnmsSeverity.CLEARED));
+    }
+
+
     private static class MockTicketer implements Ticketer {
         private boolean enabled = false;
         private List<Integer> creates = new ArrayList<>();
+        private List<Integer> closes = new ArrayList<>();
+
         private Map<Integer, Integer> updates = new LinkedHashMap<>();
 
         public void setEnabled(boolean enabled) {
@@ -368,12 +438,17 @@ public class AlarmLifecycleDroolsIT {
             updates.compute(alarm.getId(), (k, v) -> (v == null) ? 1 : v + 1);
         }
 
+        @Override
+        public void closeTicket(OnmsAlarm alarm) {
+            closes.add(alarm.getId());
+        }
+
         public List<Integer> getCreates() {
             return creates;
         }
 
-        public Map<Integer, Integer> getUpdates() {
-            return updates;
+        public List<Integer> getCloses() {
+            return closes;
         }
 
         public int getNumUpdatesFor(OnmsAlarm alarm) {

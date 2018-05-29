@@ -30,31 +30,62 @@ package org.opennms.netmgt.alarmd;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
+import org.drools.core.time.SessionPseudoClock;
 import org.kie.api.KieBase;
+import org.kie.api.KieBaseConfiguration;
 import org.kie.api.KieServices;
+import org.kie.api.conf.EventProcessingOption;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
+import org.kie.api.runtime.KieSessionConfiguration;
+import org.kie.api.runtime.conf.ClockTypeOption;
 import org.kie.api.runtime.rule.FactHandle;
+import org.opennms.netmgt.dao.api.AlarmDao;
 import org.opennms.netmgt.model.OnmsAlarm;
 import org.opennms.netmgt.model.OnmsSeverity;
+import org.opennms.netmgt.model.TroubleTicketState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.util.Date;
 
 public class AlarmLifecyleManager {
     private static final Logger LOG = LoggerFactory.getLogger(AlarmLifecyleManager.class);
 
     private final KieSession kieSession;
+    private final AlarmDao alarmDao;
+    private final Ticketer ticketer;
+    private final SessionPseudoClock clock;
 
     private Map<Integer, FactHandle> alarmIdToFactHandle = new HashMap<>();
 
-    public AlarmLifecyleManager() {
+    public AlarmLifecyleManager(AlarmDao alarmDao, Ticketer ticketer) {
+        this(alarmDao, ticketer, false);
+    }
+
+    public AlarmLifecyleManager(AlarmDao alarmDao, Ticketer ticketer, boolean usePseudoClock) {
+        this.alarmDao = Objects.requireNonNull(alarmDao);
+        this.ticketer= Objects.requireNonNull(ticketer);
         final KieServices ks = KieServices.Factory.get();
         final KieContainer kcont = ks.newKieClasspathContainer(getClass().getClassLoader());
-        final KieBase kbase = kcont.getKieBase("alarmKBase");
-        kieSession = kbase.newKieSession();
+        final KieBaseConfiguration kbaseConfig = ks.newKieBaseConfiguration();
+        kbaseConfig.setOption(EventProcessingOption.STREAM);
+        final KieBase kbase = kcont.newKieBase("alarmKBase", kbaseConfig);
+
+        final KieSessionConfiguration kieSessionConfig = KieServices.Factory.get().newKieSessionConfiguration();
+        if (usePseudoClock) {
+            kieSessionConfig.setOption(ClockTypeOption.get("pseudo"));
+        }
+        kieSession = kbase.newKieSession(kieSessionConfig, null);
         kieSession.setGlobal("alarmLifecyleManager", this);
-       // new Thread(kieSession::fireUntilHalt, "AlarmLifecyleManager-Firing").start();
+        kieSession.insert(ticketer);
+
+        if (usePseudoClock) {
+            this.clock = kieSession.getSessionClock();
+        } else {
+            this.clock = null;
+        }
     }
 
     public void destroy() {
@@ -75,5 +106,38 @@ public class AlarmLifecyleManager {
     public void clearAlarm(OnmsAlarm alarm) {
         alarm.setSeverity(OnmsSeverity.CLEARED);
         onAlarm(alarm);
+    }
+
+    public void deleteAlarm(OnmsAlarm alarm) {
+        alarmDao.delete(alarm);
+        final FactHandle fact = alarmIdToFactHandle.remove(alarm.getId());
+        if (fact != null) {
+            kieSession.delete(fact);
+        }
+    }
+
+    public void unclearAlarm(OnmsAlarm alarm) {
+        alarm.setSeverity(OnmsSeverity.get(alarm.getLastEvent().getEventSeverity()));
+        onAlarm(alarm);
+    }
+
+    public void ackAlarmAndCreateTicket(OnmsAlarm alarm) {
+        alarm.setAlarmAckUser("admin");
+        alarm.setAlarmAckTime(new Date());
+        alarm.setTTicketState(TroubleTicketState.CREATE_PENDING);
+        ticketer.createTicket(alarm);
+        onAlarm(alarm);
+    }
+
+    public void updateTicket(OnmsAlarm alarm) {
+        ticketer.updateTicket(alarm);
+    }
+
+    public SessionPseudoClock getClock() {
+        return clock;
+    }
+
+    public void tick() {
+        kieSession.fireAllRules();
     }
 }

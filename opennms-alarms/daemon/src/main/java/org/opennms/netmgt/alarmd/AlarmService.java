@@ -26,18 +26,18 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.netmgt.alarmd.api;
-
-import java.util.List;
+package org.opennms.netmgt.alarmd;
 
 import org.opennms.netmgt.model.OnmsAlarm;
 
-public interface AlarmLifecycleListener {
+public interface AlarmService extends AlarmTicketerService {
 
-    void handleAlarmSnapshot(List<OnmsAlarm> alarms);
+    void clearAlarm(OnmsAlarm alarm, long currentTime);
 
-    void handleNewOrUpdatedAlarm(OnmsAlarm alarm);
+    void deleteAlarm(OnmsAlarm alarm);
 
-    void handleDeletedAlarm(int alarmId, String reductionKey);
+    void unclearAlarm(OnmsAlarm alarm);
+
+    void ackAlarmAndCreateTicket(OnmsAlarm alarm);
 
 }

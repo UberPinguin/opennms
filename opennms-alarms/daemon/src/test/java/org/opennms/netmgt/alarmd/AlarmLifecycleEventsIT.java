@@ -110,7 +110,7 @@ public class AlarmLifecycleEventsIT implements TemporaryDatabaseAware<MockDataba
     }
 
     @Before
-    public void setUp() throws Exception {
+    public void setUp() {
 
         // Events need database IDs to make alarmd happy
         m_eventMgr.setEventWriter(m_database);
@@ -119,16 +119,10 @@ public class AlarmLifecycleEventsIT implements TemporaryDatabaseAware<MockDataba
         final OnmsNode node = new OnmsNode(m_locationDao.getDefaultLocation(), "node1");
         node.setId(1);
         m_nodeDao.save(node);
-
-        Vacuumd.destroySingleton();
-        Vacuumd vacuumd = Vacuumd.getSingleton();
-        vacuumd.setEventManager(m_eventMgr);
-        vacuumd.init();
-        vacuumd.start();
     }
 
     @After
-    public void tearDown() throws Exception {
+    public void tearDown() {
         m_alarmd.destroy();
     }
 

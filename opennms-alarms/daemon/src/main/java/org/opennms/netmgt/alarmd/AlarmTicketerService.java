@@ -30,9 +30,9 @@ package org.opennms.netmgt.alarmd;
 
 import org.opennms.netmgt.model.OnmsAlarm;
 
-public interface Ticketer {
+public interface AlarmTicketerService {
 
-    boolean isEnabled();
+    boolean isTicketingEnabled();
 
     void createTicket(OnmsAlarm alarm);
 

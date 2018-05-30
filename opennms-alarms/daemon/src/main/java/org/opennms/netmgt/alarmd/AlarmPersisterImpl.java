@@ -51,8 +51,9 @@ import org.opennms.netmgt.xml.event.UpdateField;
 import org.opennms.netmgt.xml.eventconf.LogDestType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.transaction.support.TransactionOperations;
-import org.springframework.util.Assert;
 
 import com.google.common.util.concurrent.Striped;
 
@@ -67,11 +68,23 @@ public class AlarmPersisterImpl implements AlarmPersister {
 
     protected static final Integer NUM_STRIPE_LOCKS = Integer.getInteger("org.opennms.alarmd.stripe.locks", Alarmd.THREADS * 4);
 
+    @Autowired
     private AlarmDao m_alarmDao;
+
+    @Autowired
     private EventDao m_eventDao;
+
     private EventForwarder m_eventForwarder;
+
+    @Autowired
     private EventUtil m_eventUtil;
+
+    @Autowired
     private TransactionOperations m_transactionOperations;
+
+    @Autowired
+    private AlarmManager m_alarmManager;
+
     private Striped<Lock> lockStripes = StripedExt.fairLock(NUM_STRIPE_LOCKS);
 
     private static class OnmsAlarmAndLifecycleEvent {
@@ -120,6 +133,9 @@ public class AlarmPersisterImpl implements AlarmPersister {
 
         // Send the event outside of the database transaction
         m_eventForwarder.sendNow(alarmAndEvent.getEvent());
+
+        // Notify the lifecycle manager
+        m_alarmManager.handleNewOrUpdatedAlarm(alarmAndEvent.getAlarm());
 
         return alarmAndEvent.getAlarm();
     }
@@ -381,5 +397,13 @@ public class AlarmPersisterImpl implements AlarmPersister {
 
     public EventForwarder getEventForwarder() {
         return m_eventForwarder;
+    }
+
+    public AlarmManager getAlarmManager() {
+        return m_alarmManager;
+    }
+
+    public void setAlarmManager(AlarmManager alarmManager) {
+        m_alarmManager = alarmManager;
     }
 }

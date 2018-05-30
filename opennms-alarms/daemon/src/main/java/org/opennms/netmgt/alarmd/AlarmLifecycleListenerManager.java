@@ -29,7 +29,11 @@
 package org.opennms.netmgt.alarmd;
 
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -56,12 +60,44 @@ public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscription
 
     private final Set<AlarmLifecycleListener> listeners = new LinkedHashSet<>();
     private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private final Timer timer = new Timer("AlarmLifecycleListenerManager");
 
     @Autowired
     private AlarmDao alarmDao;
 
     @Autowired
     private TransactionTemplate template;
+
+    public AlarmLifecycleListenerManager() {
+        timer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                try {
+                    doSnapshot();
+                } catch (Exception e) {
+                    LOG.error("Error while performing snapshot update.", e);
+                }
+            }
+        }, 0, TimeUnit.SECONDS.toMillis(5));
+    }
+
+    private void doSnapshot() {
+        rwLock.readLock().lock();
+        try {
+            if (listeners.size() < 1) {
+                return;
+            }
+            template.execute(new TransactionCallbackWithoutResult() {
+                @Override
+                protected void doInTransactionWithoutResult(TransactionStatus status) {
+                    final List<OnmsAlarm> allAlarms = alarmDao.findAll();
+                    listeners.forEach(l -> l.handleAlarmSnapshot(allAlarms));
+                }
+            });
+        } finally {
+            rwLock.readLock().unlock();
+        }
+    }
 
     @EventHandler(ueis = {
             EventConstants.ALARM_CREATED_UEI,

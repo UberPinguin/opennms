@@ -1,10 +1,11 @@
 package org.opennms.netmgt.alarmd;
 
+import org.kie.api.time.SessionClock;
 import org.opennms.netmgt.model.OnmsAlarm;
 import org.opennms.netmgt.model.OnmsSeverity;
 import org.opennms.netmgt.model.TroubleTicketState;
 
-global org.opennms.netmgt.alarmd.AlarmLifecyleManager alarmLifecyleManager;
+global org.opennms.netmgt.alarmd.AlarmManager alarmManager;
 
 declare org.opennms.netmgt.model.OnmsAlarm
     @role(event)
@@ -32,7 +33,7 @@ rule "cosmicClear"
     $clear : OnmsAlarm(alarmType == 2)
     $trigger : OnmsAlarm(alarmType == 1, severity.isGreaterThanOrEqual(OnmsSeverity.NORMAL), reductionKey == $clear.clearKey, this before $clear)
   then
-    alarmLifecyleManager.clearAlarm($trigger);
+    alarmManager.clearAlarm($trigger, drools.getWorkingMemory().getSessionClock().getCurrentTime());
 end
 
 /*
@@ -63,9 +64,12 @@ end
 */
 rule "unclear"
   when
-    $trigger : OnmsAlarm(alarmType == 1, severity == OnmsSeverity.CLEARED, lastEvent != null, OnmsSeverity.get(lastEvent.getEventSeverity()).isGreaterThan(OnmsSeverity.CLEARED) )
+    $trigger : OnmsAlarm(alarmType == 1,
+                         severity == OnmsSeverity.CLEARED, lastEvent != null,
+                         OnmsSeverity.get(lastEvent.getEventSeverity()).isGreaterThan(OnmsSeverity.CLEARED),
+                         lastEventTime > lastAutomationTime)
   then
-      alarmLifecyleManager.unclearAlarm($trigger);
+    alarmManager.unclearAlarm($trigger);
 end
 
 /*
@@ -128,7 +132,7 @@ rule "cleanUp"
                        (TTicketState == null || TTicketState == TroubleTicketState.CLOSED || TTicketState == TroubleTicketState.CANCELLED))
     not( OnmsAlarm( this == $alarm ) over window:time( 5m ) )
   then
-    alarmLifecyleManager.deleteAlarm($alarm);
+    alarmManager.deleteAlarm($alarm);
 end
 
 /*
@@ -157,7 +161,7 @@ rule "fullCleanUp"
                         (TTicketState == null || TTicketState == TroubleTicketState.CLOSED || TTicketState == TroubleTicketState.CANCELLED))
     not( OnmsAlarm( this == $alarm ) over window:time( 1d ) )
   then
-    alarmLifecyleManager.deleteAlarm($alarm);
+    alarmManager.deleteAlarm($alarm);
 end
 
 /*
@@ -180,7 +184,7 @@ rule "GC"
     $alarm : OnmsAlarm(alarmAckTime == null)
     not( OnmsAlarm( this == $alarm ) over window:time( 3d ) )
   then
-    alarmLifecyleManager.deleteAlarm($alarm);
+    alarmManager.deleteAlarm($alarm);
 end
 
 /*
@@ -203,7 +207,7 @@ rule "fullGC"
     $alarm : OnmsAlarm()
     not( OnmsAlarm( this == $alarm ) over window:time( 8d ) )
   then
-    alarmLifecyleManager.deleteAlarm($alarm);
+    alarmManager.deleteAlarm($alarm);
 end
 
 /*
@@ -243,14 +247,14 @@ end
 */
 rule "createTickets"
   when
-    Ticketer(isEnabled() == true)
+    AlarmTicketerService(isTicketingEnabled() == true)
     $alarm : OnmsAlarm(severity.isGreaterThan(OnmsSeverity.CLEARED) &&
                        (alarmType == 1 || alarmType == 3) &&
                        alarmAckUser == null &&
                        TTicketState == null)
     not( OnmsAlarm( this == $alarm ) over window:time( 15m ) )
   then
-    alarmLifecyleManager.ackAlarmAndCreateTicket($alarm);
+    alarmManager.ackAlarmAndCreateTicket($alarm);
 end
 
 /*
@@ -279,14 +283,14 @@ end
 */
 rule "createCriticalTicket"
   when
-    Ticketer(isEnabled() == true)
+    AlarmTicketerService(isTicketingEnabled() == true)
     $alarm : OnmsAlarm(severity == OnmsSeverity.CRITICAL &&
                        (alarmType == 1 || alarmType == 3) &&
                        alarmAckUser == null &&
                        TTicketState == null)
     not( OnmsAlarm( this == $alarm ) over window:time( 5m ) )
   then
-    alarmLifecyleManager.ackAlarmAndCreateTicket($alarm);
+    alarmManager.ackAlarmAndCreateTicket($alarm);
 end
 
 /*
@@ -326,13 +330,13 @@ end
 */
 rule "updateTickets"
   when
-    Ticketer(isEnabled() == true)
+    AlarmTicketerService(isTicketingEnabled() == true)
     $alarm : OnmsAlarm(severity.isGreaterThan(OnmsSeverity.CLEARED) &&
                        (alarmType == 1 || alarmType == 3) &&
                        TTicketState != null)
     // FIXME: not( OnmsAlarm( this == $alarm ) over window:time( 15m ) )
   then
-    alarmLifecyleManager.updateTicket($alarm);
+    alarmManager.updateTicket($alarm);
 end
 
 /*
@@ -365,13 +369,13 @@ end
 */
 rule "closeClearedAlarmTickets"
   when
-    Ticketer(isEnabled() == true)
+    AlarmTicketerService(isTicketingEnabled() == true)
     $alarm : OnmsAlarm(severity == OnmsSeverity.CLEARED &&
                        alarmType == 1 &&
                        TTicketState == TroubleTicketState.OPEN)
      // FIXME: not( OnmsAlarm( this == $alarm ) over window:time( 15m ) )
   then
-    alarmLifecyleManager.closeTicket($alarm);
+    alarmManager.closeTicket($alarm);
 end
 
 /*  <automation name="clearAlarmsForClosedTickets" interval="60000" active="false"
@@ -399,10 +403,10 @@ end
 */
 rule "clearAlarmsForClosedTickets"
   when
-    Ticketer(isEnabled() == true)
+    AlarmTicketerService(isTicketingEnabled() == true)
     $alarm : OnmsAlarm(severity.isGreaterThan(OnmsSeverity.CLEARED) &&
                        (alarmType == 1 || alarmType == 3) &&
                        TTicketState == TroubleTicketState.CLOSED)
   then
-    alarmLifecyleManager.clearAlarm($alarm);
+    alarmManager.clearAlarm($alarm, drools.getWorkingMemory().getSessionClock().getCurrentTime());
 end

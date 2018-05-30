@@ -12,12 +12,12 @@
   <context:annotation-config />
   <tx:annotation-driven />
 
+  <bean id="defaultAlarmTicketerService" class="org.opennms.netmgt.alarmd.DefaultAlarmTicketerService" />
+
+  <bean id="alarmManager" class="org.opennms.netmgt.alarmd.AlarmManager" />
+
   <bean id="alarmPersister" class="org.opennms.netmgt.alarmd.AlarmPersisterImpl" >
-    <property name="transactionOperations" ref="transactionTemplate" />
-    <property name="alarmDao" ref="alarmDao" />
-    <property name="eventDao" ref="eventDao" />
     <property name="eventForwarder" ref="eventForwarder"/>
-    <property name="eventUtil" ref="eventUtil"/>
   </bean>
 
   <bean id="daemon" class="org.opennms.netmgt.alarmd.Alarmd" >

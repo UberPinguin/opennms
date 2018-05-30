@@ -54,7 +54,6 @@ import org.opennms.netmgt.events.api.EventConstants;
 import org.opennms.netmgt.model.OnmsAlarm;
 import org.opennms.netmgt.model.OnmsNode;
 import org.opennms.netmgt.model.events.EventBuilder;
-import org.opennms.netmgt.vacuumd.Vacuumd;
 import org.opennms.netmgt.xml.event.AlarmData;
 import org.opennms.test.JUnitConfigurationEnvironment;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -111,6 +110,8 @@ public class AlarmLifecycleEventsIT implements TemporaryDatabaseAware<MockDataba
 
     @Before
     public void setUp() {
+        // Async.
+        m_eventMgr.setSynchronous(false);
 
         // Events need database IDs to make alarmd happy
         m_eventMgr.setEventWriter(m_database);

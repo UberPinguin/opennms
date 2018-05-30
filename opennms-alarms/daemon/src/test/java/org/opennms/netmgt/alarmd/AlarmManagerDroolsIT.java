@@ -48,7 +48,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.opennms.netmgt.dao.api.AlarmDao;
 import org.opennms.netmgt.dao.mock.MockTransactionTemplate;
@@ -256,7 +255,6 @@ public class AlarmManagerDroolsIT {
     }
 
     @Test
-    @Ignore
     public void canUnclearAlarm() {
         final OnmsEvent event = new OnmsEvent();
         event.setEventTime(new Date(101));
@@ -267,6 +265,7 @@ public class AlarmManagerDroolsIT {
         alarm.setAlarmType(1);
         alarm.setSeverity(OnmsSeverity.CLEARED);
         alarm.setReductionKey("n1:oops");
+        alarm.setLastAutomationTime(new Date(event.getEventTime().getTime() - 1));
         alarm.setLastEvent(event);
         alarm.setLastEventTime(event.getEventTime());
         when(alarmDao.get(alarm.getId())).thenReturn(alarm);

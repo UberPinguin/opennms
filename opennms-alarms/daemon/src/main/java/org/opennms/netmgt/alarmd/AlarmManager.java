@@ -122,6 +122,7 @@ public class AlarmManager implements AlarmLifecycleListener, AlarmService, Initi
 
     @Override
     public synchronized void handleAlarmSnapshot(List<OnmsAlarm> alarms) {
+        LOG.info("Handling snapshot for {} alarms.", alarms.size());
         final Map<Integer, OnmsAlarm> alarmsInDbById = alarms.stream()
                 .filter(a -> a.getId() != null)
                 .collect(Collectors.toMap(OnmsAlarm::getId, a -> a));
@@ -166,7 +167,13 @@ public class AlarmManager implements AlarmLifecycleListener, AlarmService, Initi
             fact = kieSession.insert(alarm);
             alarmIdToFactHandle.put(alarm.getId(), fact);
         } else {
-            kieSession.update(fact, alarm);
+            // Remove
+            kieSession.delete(fact);
+            // Reinsert
+            fact = kieSession.insert(alarm);
+            alarmIdToFactHandle.put(alarm.getId(), fact);
+            // FIXME: If the time field changes, we need to remove and re-insert rather than update?
+            //kieSession.update(fact, alarm);
         }
         kieSession.fireAllRules();
     }

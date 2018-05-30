@@ -31,6 +31,7 @@ package org.opennms.features.kafka.producer;
 import java.io.IOException;
 import java.util.Dictionary;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.concurrent.Callable;
@@ -291,6 +292,11 @@ public class OpennmsKafkaProducer implements AlarmLifecycleListener, EventListen
                 callback.accept(recordMetadata);
             }
         });
+    }
+
+    @Override
+    public void handleAlarmSnapshot(List<OnmsAlarm> alarms) {
+        // TODO: Delegate to the sync
     }
 
     @Override

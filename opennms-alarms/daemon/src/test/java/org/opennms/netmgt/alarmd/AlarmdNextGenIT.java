@@ -91,7 +91,7 @@ public class AlarmdNextGenIT {
         assertThat(problemStates.get(1).getAlarm().getCounter(), equalTo(1));
         // state 2 at t=102
         assertThat(problemStates.get(2).getTime(), equalTo(102));
-        assertThat(problemStates.get(2).getAlarm(), nullValue());
+        assertThat(problemStates.get(2).getAlarm(), nullValue()); // DELETED
 
         // the resolution
         List<State> resolutionStates = results.getStateChangesForAlarmWithId(results.getResolutionAlarm(1).getId());
@@ -105,7 +105,11 @@ public class AlarmdNextGenIT {
     }
 
     private ScenarioResults play(Scenario scenario) {
-        return new ScenarioResults();
+        final ScenarioResults results = new ScenarioResults();
+        OnmsAlarm alarm = new OnmsAlarm();
+        results.addAlarm(1, alarm);
+
+        return results;
     }
 
     private static class Scenario {
@@ -122,6 +126,9 @@ public class AlarmdNextGenIT {
     }
 
     private static class ScenarioResults {
+
+        public void addAlarm(int i, OnmsAlarm alarm) {
+        }
 
         public List<OnmsAlarm> getAlarms(int t) {
             return Collections.emptyList();

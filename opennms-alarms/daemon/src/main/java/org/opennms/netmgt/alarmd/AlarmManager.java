@@ -85,7 +85,7 @@ public class AlarmManager implements AlarmLifecycleListener, AlarmService, Initi
     private Map<Integer, FactHandle> alarmIdToFactHandle = new HashMap<>();
 
     public AlarmManager() {
-        this(false);
+        this(Boolean.getBoolean("alarmd.pseudoclock"));
     }
 
     public AlarmManager(boolean usePseudoClock) {
@@ -225,7 +225,7 @@ public class AlarmManager implements AlarmLifecycleListener, AlarmService, Initi
                 LOG.warn("Alarm disappeared: {}. Skipping delete.", alarm);
                 return null;
             }
-            alarmDao.delete(alarm);
+            alarmDao.delete(alarmInTrans);
             return null;
         });
         // Update working memory

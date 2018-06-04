@@ -26,7 +26,7 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.netmgt.alarmd.ng;
+package org.opennms.netmgt.alarmd;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
@@ -35,13 +35,17 @@ import static org.hamcrest.Matchers.lessThan;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.hamcrest.core.IsNot.not;
-import static org.opennms.netmgt.alarmd.ng.AlarmMatchers.acknowledged;
-import static org.opennms.netmgt.alarmd.ng.AlarmMatchers.hasSeverity;
+import static org.opennms.netmgt.alarmd.driver.AlarmMatchers.acknowledged;
+import static org.opennms.netmgt.alarmd.driver.AlarmMatchers.hasSeverity;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
+import org.opennms.netmgt.alarmd.driver.JUnitScenarioDriver;
+import org.opennms.netmgt.alarmd.driver.Scenario;
+import org.opennms.netmgt.alarmd.driver.ScenarioResults;
+import org.opennms.netmgt.alarmd.driver.State;
 import org.opennms.netmgt.model.OnmsSeverity;
 
 /**
@@ -56,7 +60,7 @@ import org.opennms.netmgt.model.OnmsSeverity;
  *
  * @author jwhite
  */
-public class AlarmdNgIT {
+public class AlarmdBlackboxIT {
 
     /**
      * Verifies the basic life-cycle of a trigger, followed by a clear.

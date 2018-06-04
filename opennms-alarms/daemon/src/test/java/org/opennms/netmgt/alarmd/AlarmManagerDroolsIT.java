@@ -57,6 +57,11 @@ import org.opennms.netmgt.model.OnmsEvent;
 import org.opennms.netmgt.model.OnmsSeverity;
 import org.opennms.netmgt.model.TroubleTicketState;
 
+/**
+ * Used to isolate and trigger specific Drools rules in the default ruleset for Alarmd.
+ *
+ * @author jwhite
+ */
 public class AlarmManagerDroolsIT {
 
     private AlarmManager alm;
@@ -70,22 +75,23 @@ public class AlarmManagerDroolsIT {
         alarmDao = mock(AlarmDao.class);
         eventForwarder = mock(EventForwarder.class);
         alarmLifecycleListenerManager = mock(AlarmLifecycleListenerManager.class);
-        alm = new AlarmManager(true);
+        alm = new AlarmManager();
         alm.setAlarmDao(alarmDao);
         alm.setTicketer(ticketer);
+        alm.setUsePseudoClock(true);
 
         MockTransactionTemplate mockTransactionTemplate = new MockTransactionTemplate();
         mockTransactionTemplate.afterPropertiesSet();
         alm.setTransactionOperations(mockTransactionTemplate);
         alm.setEventForwarder(eventForwarder);
         alm.setAlarmLifecycleListenerManager(alarmLifecycleListenerManager);
-        alm.afterPropertiesSet();
+        alm.start();
     }
 
     @After
     public void tearDown() {
         if (alm != null) {
-            alm.destroy();
+            alm.stop();
         }
     }
 

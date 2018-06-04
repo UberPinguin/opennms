@@ -26,7 +26,7 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.netmgt.alarmd.ng;
+package org.opennms.netmgt.alarmd.driver;
 
 import java.util.Objects;
 

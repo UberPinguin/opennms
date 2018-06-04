@@ -26,27 +26,24 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.netmgt.alarmd.ng;
+package org.opennms.netmgt.alarmd.driver;
 
-import java.util.Date;
-import java.util.Objects;
+import org.opennms.netmgt.model.OnmsAlarm;
 
-import org.opennms.netmgt.xml.event.Event;
+public class State {
+    private final long time;
+    private final OnmsAlarm alarm;
 
-public class SendEventAction implements Action {
-    private final Event event;
-
-    public SendEventAction(Event event) {
-        this.event = Objects.requireNonNull(event);
+    public State(long time, OnmsAlarm alarm) {
+        this.time = time;
+        this.alarm = alarm;
     }
 
-    @Override
-    public Date getTime() {
-        return event.getTime();
+    public long getTime() {
+        return time;
     }
 
-    @Override
-    public void visit(ActionVisitor visitor) {
-        visitor.sendEvent(event);
+    public OnmsAlarm getAlarm() {
+        return alarm;
     }
 }

@@ -78,6 +78,12 @@ public class Alarmd extends AbstractServiceDaemon implements ThreadAwareEventLis
     @Qualifier("eventProxy")
     private EventProxy m_eventProxy;
 
+    @Autowired
+    private AlarmLifecycleListenerManager m_alm;
+
+    @Autowired
+    private AlarmManager m_alarmManager;
+
     public Alarmd() {
         super(NAME);
     }
@@ -191,12 +197,24 @@ public class Alarmd extends AbstractServiceDaemon implements ThreadAwareEventLis
     }
 
     @Override
+    public synchronized void onStart() {
+        // Start the ALM
+        m_alm.start();
+        // Start the manager
+        m_alarmManager.start();
+    }
+
+    @Override
     public synchronized void onStop() {
         // On shutdown, stop all of the NBIs
         m_northboundInterfaces.forEach(nb -> {
             LOG.debug("destroy: stopping {}", nb.getName());
             nb.stop();
         });
+        // Stop the ALM
+        m_alm.stop();
+        // Stop the manager
+        m_alarmManager.stop();
     }
 
     public synchronized void onNorthbounderRegistered(final Northbounder northbounder, final Map<String,String> properties) {

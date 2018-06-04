@@ -26,7 +26,7 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.netmgt.alarmd.ng;
+package org.opennms.netmgt.alarmd.driver;
 
 import java.util.Comparator;
 import java.util.Date;
@@ -72,7 +72,7 @@ import org.springframework.transaction.support.TransactionTemplate;
         "classpath:/META-INF/opennms/mockEventIpcManager.xml",
         "classpath:/META-INF/opennms/applicationContext-alarmd.xml"
 })
-@JUnitConfigurationEnvironment(systemProperties = {"alarmd.pseudoclock=true"})
+@JUnitConfigurationEnvironment
 @JUnitTemporaryDatabase(dirtiesContext=false,tempDbClass=MockDatabase.class)
 public class AlarmdDriver implements TemporaryDatabaseAware<MockDatabase>, ActionVisitor, ScenarioHandler {
 
@@ -122,13 +122,18 @@ public class AlarmdDriver implements TemporaryDatabaseAware<MockDatabase>, Actio
         final OnmsNode node = new OnmsNode(m_locationDao.getDefaultLocation(), "node1");
         node.setId(1);
         m_nodeDao.save(node);
+
+        // Use a pseudo-clock
+        m_alarmManager.setUsePseudoClock(true);
+
+        // Start alarmd
+        m_alarmd.start();
     }
 
     @After
     public void tearDown() {
         m_alarmd.destroy();
     }
-
 
     @Test
     public void canDriveScenario() {

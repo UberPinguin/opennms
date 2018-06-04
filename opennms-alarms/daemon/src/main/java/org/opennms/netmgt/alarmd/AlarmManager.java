@@ -55,13 +55,12 @@ import org.opennms.netmgt.model.TroubleTicketState;
 import org.opennms.netmgt.model.events.EventBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionOperations;
 
 import com.google.common.collect.Sets;
 
-public class AlarmManager implements AlarmLifecycleListener, AlarmService, InitializingBean {
+public class AlarmManager implements AlarmLifecycleListener, AlarmService {
     private static final Logger LOG = LoggerFactory.getLogger(AlarmManager.class);
 
     @Autowired
@@ -79,16 +78,15 @@ public class AlarmManager implements AlarmLifecycleListener, AlarmService, Initi
     @Autowired
     private AlarmLifecycleListenerManager alarmLifecycleListenerManager;
 
-    private final KieSession kieSession;
-    private final SessionPseudoClock clock;
+    private boolean usePseudoClock = false;
 
-    private Map<Integer, FactHandle> alarmIdToFactHandle = new HashMap<>();
+    private KieSession kieSession;
 
-    public AlarmManager() {
-        this(Boolean.getBoolean("alarmd.pseudoclock"));
-    }
+    private SessionPseudoClock clock;
 
-    public AlarmManager(boolean usePseudoClock) {
+    private final Map<Integer, FactHandle> alarmIdToFactHandle = new HashMap<>();
+
+    public void start() {
         final KieServices ks = KieServices.Factory.get();
         final KieContainer kcont = ks.newKieClasspathContainer(getClass().getClassLoader());
         final KieBaseConfiguration kbaseConfig = ks.newKieBaseConfiguration();
@@ -99,6 +97,7 @@ public class AlarmManager implements AlarmLifecycleListener, AlarmService, Initi
         if (usePseudoClock) {
             kieSessionConfig.setOption(ClockTypeOption.get("pseudo"));
         }
+
         kieSession = kbase.newKieSession(kieSessionConfig, null);
         kieSession.setGlobal("alarmManager", this);
 
@@ -107,22 +106,24 @@ public class AlarmManager implements AlarmLifecycleListener, AlarmService, Initi
         } else {
             this.clock = null;
         }
-    }
 
-    @Override
-    public void afterPropertiesSet() {
+        alarmIdToFactHandle.clear();
+
         kieSession.insert(ticketer);
         alarmLifecycleListenerManager.addAlarmLifecyleListener(this);
     }
 
-    public void destroy() {
-        kieSession.halt();
+    public void stop() {
+        if (kieSession != null) {
+            kieSession.halt();
+            kieSession = null;
+        }
         alarmLifecycleListenerManager.removeAlarmLifecycleListener(this);
     }
 
     @Override
     public synchronized void handleAlarmSnapshot(List<OnmsAlarm> alarms) {
-        LOG.info("Handling snapshot for {} alarms.", alarms.size());
+        LOG.debug("Handling snapshot for {} alarms.", alarms.size());
         final Map<Integer, OnmsAlarm> alarmsInDbById = alarms.stream()
                 .filter(a -> a.getId() != null)
                 .collect(Collectors.toMap(OnmsAlarm::getId, a -> a));
@@ -340,5 +341,9 @@ public class AlarmManager implements AlarmLifecycleListener, AlarmService, Initi
 
     public void setAlarmLifecycleListenerManager(AlarmLifecycleListenerManager alarmLifecycleListenerManager) {
         this.alarmLifecycleListenerManager = alarmLifecycleListenerManager;
+    }
+
+    public void setUsePseudoClock(boolean usePseudoClock) {
+        this.usePseudoClock = usePseudoClock;
     }
 }

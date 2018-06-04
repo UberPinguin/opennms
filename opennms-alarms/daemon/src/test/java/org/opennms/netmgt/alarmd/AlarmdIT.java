@@ -189,6 +189,8 @@ public class AlarmdIT implements TemporaryDatabaseAware<MockDatabase>, Initializ
         
         m_northbounder = new MockNorthbounder();
         m_registry.register(m_northbounder, Northbounder.class);
+
+        m_alarmd.start();
     }
 
     @After
@@ -320,9 +322,9 @@ public class AlarmdIT implements TemporaryDatabaseAware<MockDatabase>, Initializ
     }
 
     @Test
-    public void testNullEvent() throws Exception {
+    public void testNullEvent() {
         ThrowableAnticipator ta = new ThrowableAnticipator();
-        ta.anticipate(new IllegalArgumentException("Incoming event was null, aborting"));
+        ta.anticipate(new NullPointerException("Cannot create alarm from null event."));
         try {
             m_alarmd.getPersister().persist(null, true);
         } catch (Throwable t) {

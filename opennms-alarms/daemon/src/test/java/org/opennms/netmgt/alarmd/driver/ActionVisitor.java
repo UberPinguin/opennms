@@ -26,24 +26,18 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.netmgt.alarmd.ng;
+package org.opennms.netmgt.alarmd.driver;
+
+import java.util.function.Function;
 
 import org.opennms.netmgt.model.OnmsAlarm;
+import org.opennms.netmgt.xml.event.Event;
+import java.util.Date;
 
-public class State {
-    private final long time;
-    private final OnmsAlarm alarm;
+public interface ActionVisitor {
 
-    public State(long time, OnmsAlarm alarm) {
-        this.time = time;
-        this.alarm = alarm;
-    }
+    void sendEvent(Event e);
 
-    public long getTime() {
-        return time;
-    }
+    void acknowledgeAlarm(String ackUser, Date ackTime, Function<OnmsAlarm, Boolean> filter);
 
-    public OnmsAlarm getAlarm() {
-        return alarm;
-    }
 }

@@ -120,6 +120,9 @@ public class AlarmLifecycleEventsIT implements TemporaryDatabaseAware<MockDataba
         final OnmsNode node = new OnmsNode(m_locationDao.getDefaultLocation(), "node1");
         node.setId(1);
         m_nodeDao.save(node);
+
+        // Fire it up
+        m_alarmd.start();
     }
 
     @After

@@ -60,7 +60,7 @@ public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscription
 
     private final Set<AlarmLifecycleListener> listeners = new LinkedHashSet<>();
     private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
-    private final Timer timer = new Timer("AlarmLifecycleListenerManager");
+    private Timer timer;
 
     @Autowired
     private AlarmDao alarmDao;
@@ -68,7 +68,8 @@ public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscription
     @Autowired
     private TransactionTemplate template;
 
-    public AlarmLifecycleListenerManager() {
+    public void start() {
+        timer = new Timer("AlarmLifecycleListenerManager");
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
@@ -79,6 +80,13 @@ public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscription
                 }
             }
         }, 0, TimeUnit.SECONDS.toMillis(5));
+    }
+
+    public void stop() {
+        if (timer != null) {
+            timer.cancel();
+            timer = null;
+        }
     }
 
     private void doSnapshot() {

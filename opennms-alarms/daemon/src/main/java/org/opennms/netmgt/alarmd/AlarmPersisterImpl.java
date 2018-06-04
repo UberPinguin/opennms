@@ -315,7 +315,7 @@ public class AlarmPersisterImpl implements AlarmPersister {
         }
 
         if (event.getDbid() <= 0) {
-            throw new IllegalStateException("Incoming event has an illegal dbid (" + event.getDbid() + "), aborting");
+            throw new IllegalArgumentException("Incoming event has an illegal dbid (" + event.getDbid() + "), aborting");
         }
 
         return true;

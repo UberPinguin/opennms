@@ -268,7 +268,7 @@ public class AlarmdNgIT {
     }
 
     private ScenarioResults play(Scenario scenario) {
-        Driver driver = new Driver();
+        JUnitScenarioDriver driver = new JUnitScenarioDriver();
         return driver.run(scenario);
     }
 

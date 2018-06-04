@@ -58,6 +58,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/**
+ * This class is expected to be ran by the {@link JUnitScenarioDriver}
+ */
 @RunWith(OpenNMSJUnit4ClassRunner.class)
 @ContextConfiguration(locations={
         "classpath:/META-INF/opennms/applicationContext-soa.xml",
@@ -71,10 +74,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 })
 @JUnitConfigurationEnvironment(systemProperties = {"alarmd.pseudoclock=true"})
 @JUnitTemporaryDatabase(dirtiesContext=false,tempDbClass=MockDatabase.class)
-public class AlarmdDriverIT implements TemporaryDatabaseAware<MockDatabase>, ActionVisitor {
-
-    static Scenario SCENARIO;
-    static ScenarioResults RESULTS;
+public class AlarmdDriver implements TemporaryDatabaseAware<MockDatabase>, ActionVisitor, ScenarioHandler {
 
     @Autowired
     private Alarmd m_alarmd;
@@ -104,9 +104,11 @@ public class AlarmdDriverIT implements TemporaryDatabaseAware<MockDatabase>, Act
         m_database = database;
     }
 
+    private Scenario scenario;
+
     private final long tickLength = 1;
 
-    private ScenarioResults results = new ScenarioResults();
+    private final ScenarioResults results = new ScenarioResults();
 
     @Before
     public void setUp() {
@@ -130,19 +132,18 @@ public class AlarmdDriverIT implements TemporaryDatabaseAware<MockDatabase>, Act
 
     @Test
     public void canDriveScenario() {
-        if (SCENARIO.getActions().size() == 0) {
-            RESULTS = results;
+        if (scenario.getActions().size() == 0) {
             return;
         }
 
-        final Map<Long,List<Action>> actionsByTick = SCENARIO.getActions().stream()
+        final Map<Long,List<Action>> actionsByTick = scenario.getActions().stream()
                 .collect(Collectors.groupingBy(a -> roundToTick(a.getTime())));
 
-        final long start = Math.max(SCENARIO.getActions().stream()
+        final long start = Math.max(scenario.getActions().stream()
                 .min(Comparator.comparing(Action::getTime))
                 .map(e -> roundToTick(e.getTime()))
                 .get() - tickLength, 0);
-        final long end = SCENARIO.getActions().stream()
+        final long end = scenario.getActions().stream()
                 .max(Comparator.comparing(Action::getTime))
                 .map(e -> roundToTick(e.getTime()))
                 .get() + tickLength;
@@ -178,8 +179,6 @@ public class AlarmdDriverIT implements TemporaryDatabaseAware<MockDatabase>, Act
         tickAtRateUntil(TimeUnit.HOURS.toMillis(1),
                 end + TimeUnit.DAYS.toMillis(1),
                 end + TimeUnit.DAYS.toMillis(8));
-
-        RESULTS = results;
     }
 
     private void tickAtRateUntil(long tickLength, long start, long end) {
@@ -212,5 +211,15 @@ public class AlarmdDriverIT implements TemporaryDatabaseAware<MockDatabase>, Act
                     });
             return null;
         });
+    }
+
+    @Override
+    public void setScenario(Scenario scenario) {
+        this.scenario = scenario;
+    }
+
+    @Override
+    public ScenarioResults getResults() {
+        return results;
     }
 }

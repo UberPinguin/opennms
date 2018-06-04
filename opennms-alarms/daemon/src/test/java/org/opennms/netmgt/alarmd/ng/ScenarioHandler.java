@@ -28,18 +28,10 @@
 
 package org.opennms.netmgt.alarmd.ng;
 
-import org.junit.runner.Description;
-import org.junit.runner.Runner;
-import org.junit.runner.notification.RunNotifier;
+public interface ScenarioHandler {
 
-public class MyRunner extends Runner {
-    @Override
-    public Description getDescription() {
-        return null;
-    }
+    void setScenario(Scenario scenario);
 
-    @Override
-    public void run(RunNotifier notifier) {
+    ScenarioResults getResults();
 
-    }
 }

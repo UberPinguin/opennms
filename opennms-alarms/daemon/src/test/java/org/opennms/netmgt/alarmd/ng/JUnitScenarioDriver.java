@@ -28,28 +28,28 @@
 
 package org.opennms.netmgt.alarmd.ng;
 
-import org.junit.runner.Computer;
 import org.junit.runner.JUnitCore;
 import org.junit.runner.Result;
+import org.junit.runners.model.InitializationError;
 
-public class Driver {
+public class JUnitScenarioDriver {
 
     public ScenarioResults run(Scenario scenario) {
-        // Statically assign the scenario to the test
-        // This is the easiest way to pass the instance to the test class, which allows
-        // us to leverage the existing JUnit infrastructure for bootstraping alarmd
-        AlarmdDriverIT.SCENARIO = scenario;
-        AlarmdDriverIT.RESULTS = null;
-
         // Run the test
-        final Computer computer = new Computer();
         final JUnitCore jUnitCore = new JUnitCore();
-        final Result junitResult = jUnitCore.run(computer, AlarmdDriverIT.class);
+        final JUnitScenarioRunner runner;
+        try {
+            runner = new JUnitScenarioRunner(AlarmdDriver.class, scenario);
+        } catch (InitializationError initializationError) {
+            throw new IllegalStateException(initializationError);
+        }
+
+        final Result junitResult = jUnitCore.run(runner);
         if(!junitResult.wasSuccessful()) {
             throw new RuntimeException("Playback failed:" + junitResult.getFailures());
         }
 
-        final ScenarioResults results = AlarmdDriverIT.RESULTS;
+        final ScenarioResults results = runner.getResults();
         if (results == null) {
             throw new IllegalStateException("Results not set");
         }

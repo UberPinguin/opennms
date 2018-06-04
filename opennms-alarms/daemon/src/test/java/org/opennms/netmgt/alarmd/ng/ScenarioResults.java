@@ -53,6 +53,13 @@ public class ScenarioResults {
         return alarmsByTime.getOrDefault(time, Collections.emptyList());
     }
 
+    public List<OnmsAlarm> getAlarmsAtLastKnownTime() {
+        final Long lastTime = alarmsByTime.keySet().stream()
+                .max(Comparator.comparingLong(l -> l ))
+                .orElseThrow(() -> new IllegalArgumentException("No times are known."));
+        return alarmsByTime.get(lastTime);
+    }
+
     public OnmsAlarm getProblemAlarm(long time) {
         return getFirstAlarmWithType(time, 1, "problem");
     }
@@ -125,7 +132,9 @@ public class ScenarioResults {
         return Objects.equals(a1.getId(), a2.getId())
             && Objects.equals(a1.getLastEventTime(), a2.getLastEventTime())
                 && Objects.equals(a1.getLastAutomationTime(), a2.getLastAutomationTime())
-                && Objects.equals(a1.getSeverity(), a2.getSeverity());
+                && Objects.equals(a1.getSeverity(), a2.getSeverity())
+                && Objects.equals(a1.getAckUser(), a2.getAckUser())
+                && Objects.equals(a1.getAckTime(), a2.getAckTime());
     }
 
     public void addAlarm(long time, OnmsAlarm alarm) {

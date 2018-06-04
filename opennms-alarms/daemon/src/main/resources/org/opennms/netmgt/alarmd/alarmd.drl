@@ -33,7 +33,7 @@ rule "cosmicClear"
     $clear : OnmsAlarm(alarmType == 2)
     $trigger : OnmsAlarm(alarmType == 1, severity.isGreaterThanOrEqual(OnmsSeverity.NORMAL), reductionKey == $clear.clearKey, this before $clear)
   then
-    alarmManager.clearAlarm($trigger, drools.getWorkingMemory().getSessionClock().getCurrentTime());
+    alarmManager.clearAlarm($trigger, $clear.getLastEventTime().getTime());
 end
 
 /*
@@ -61,6 +61,8 @@ end
          WHERE alarmid = ${_id}
       </statement>
     </action>
+
+    The lastAutomationTime is set to the time of the clearing event.
 */
 rule "unclear"
   when

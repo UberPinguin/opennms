@@ -28,10 +28,16 @@
 
 package org.opennms.netmgt.alarmd.ng;
 
+import java.util.function.Function;
+
+import org.opennms.netmgt.model.OnmsAlarm;
+import org.opennms.netmgt.xml.event.Event;
 import java.util.Date;
 
-public interface Action {
-    Date getTime();
+public interface ActionVisitor {
 
-    void visit(ActionVisitor visitor);
+    void sendEvent(Event e);
+
+    void acknowledgeAlarm(String ackUser, Date ackTime, Function<OnmsAlarm, Boolean> filter);
+
 }

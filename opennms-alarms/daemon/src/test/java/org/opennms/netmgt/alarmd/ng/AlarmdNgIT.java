@@ -39,12 +39,23 @@ import static org.opennms.netmgt.alarmd.ng.AlarmMatchers.acknowledged;
 import static org.opennms.netmgt.alarmd.ng.AlarmMatchers.hasSeverity;
 
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
 import org.opennms.netmgt.model.OnmsSeverity;
 
+/**
+ * This test suite allows us to:
+ *  A) Define and play out scenarios using timestamped events and actions.
+ *  B) Playback the scenarios
+ *  C) Analyze the state of alarms at various points in time.
+ *  D) Analyze the state changes of a particular alarm over time.
+ *
+ * Using these tools we can validate the behavior of the alarms in various scenarios
+ * without worrying about the underlying mechanics.
+ *
+ * @author jwhite
+ */
 public class AlarmdNgIT {
 
     /**
@@ -72,7 +83,7 @@ public class AlarmdNgIT {
         assertThat(results.getProblemAlarm(2), hasSeverity(OnmsSeverity.CLEARED));
         assertThat(results.getResolutionAlarm(2), hasSeverity(OnmsSeverity.NORMAL));
         // t=∞
-        assertThat(results.getAlarms(-1), hasSize(0));
+        assertThat(results.getAlarmsAtLastKnownTime(), hasSize(0));
 
         // Now verify the state changes for the particular alarms
 
@@ -124,34 +135,34 @@ public class AlarmdNgIT {
         assertThat(results.getAlarms(0), hasSize(0));
         // t=1, a single problem alarm
         assertThat(results.getAlarms(1), hasSize(1));
-        assertThat(results.getProblemAlarm(1), hasSeverity(OnmsSeverity.WARNING));
+        assertThat(results.getProblemAlarm(1), hasSeverity(OnmsSeverity.MAJOR));
         assertThat(results.getProblemAlarm(1).getCounter(), equalTo(1));
         // t=2, a (cleared) problem and a resolution
         assertThat(results.getAlarms(2), hasSize(2));
         assertThat(results.getProblemAlarm(2), hasSeverity(OnmsSeverity.CLEARED));
         assertThat(results.getProblemAlarm(2).getCounter(), equalTo(1));
-        assertThat(results.getResolutionAlarm(2), hasSeverity(OnmsSeverity.CLEARED));
+        assertThat(results.getResolutionAlarm(2), hasSeverity(OnmsSeverity.NORMAL));
         assertThat(results.getResolutionAlarm(2).getCounter(), equalTo(1));
         // t=3, a (re-armed) problem and a resolution
         assertThat(results.getAlarms(3), hasSize(2));
-        assertThat(results.getProblemAlarm(3), hasSeverity(OnmsSeverity.WARNING));
+        assertThat(results.getProblemAlarm(3), hasSeverity(OnmsSeverity.MAJOR));
         assertThat(results.getProblemAlarm(3).getCounter(), equalTo(2));
-        assertThat(results.getResolutionAlarm(3), hasSeverity(OnmsSeverity.CLEARED));
+        assertThat(results.getResolutionAlarm(3), hasSeverity(OnmsSeverity.NORMAL));
         assertThat(results.getResolutionAlarm(3).getCounter(), equalTo(1));
         // t=4, a (cleared) problem and a resolution
         assertThat(results.getAlarms(4), hasSize(2));
         assertThat(results.getProblemAlarm(4), hasSeverity(OnmsSeverity.CLEARED));
         assertThat(results.getProblemAlarm(4).getCounter(), equalTo(2));
-        assertThat(results.getResolutionAlarm(4), hasSeverity(OnmsSeverity.CLEARED));
-        assertThat(results.getResolutionAlarm(4).getCounter(), equalTo(1));
+        assertThat(results.getResolutionAlarm(4), hasSeverity(OnmsSeverity.NORMAL));
+        assertThat(results.getResolutionAlarm(4).getCounter(), equalTo(2));
         // t=5, a (re-armed) problem and a resolution
         assertThat(results.getAlarms(5), hasSize(2));
-        assertThat(results.getProblemAlarm(5), hasSeverity(OnmsSeverity.WARNING));
+        assertThat(results.getProblemAlarm(5), hasSeverity(OnmsSeverity.MAJOR));
         assertThat(results.getProblemAlarm(5).getCounter(), equalTo(3));
-        assertThat(results.getResolutionAlarm(5), hasSeverity(OnmsSeverity.CLEARED));
+        assertThat(results.getResolutionAlarm(5), hasSeverity(OnmsSeverity.NORMAL));
         assertThat(results.getResolutionAlarm(5).getCounter(), equalTo(2));
         // t=∞
-        assertThat(results.getAlarms(-1), hasSize(0));
+        assertThat(results.getAlarmsAtLastKnownTime(), hasSize(0));
     }
 
     /**
@@ -174,19 +185,40 @@ public class AlarmdNgIT {
         assertThat(results.getAlarms(0), hasSize(0));
         // t=1, a single problem alarm that is not yet acknowledged
         assertThat(results.getAlarms(1), hasSize(1));
-        assertThat(results.getProblemAlarm(1), hasSeverity(OnmsSeverity.WARNING));
+        assertThat(results.getProblemAlarm(1), hasSeverity(OnmsSeverity.MAJOR));
         assertThat(results.getProblemAlarm(1), not(acknowledged()));
         // t=2, a single problem alarm that is acknowledged
         assertThat(results.getAlarms(2), hasSize(1));
-        assertThat(results.getProblemAlarm(2), hasSeverity(OnmsSeverity.WARNING));
+        assertThat(results.getProblemAlarm(2), hasSeverity(OnmsSeverity.MAJOR));
         assertThat(results.getProblemAlarm(2), acknowledged());
         // t=3, a (acknowledged & cleared) problem and a resolution
         assertThat(results.getAlarms(3), hasSize(2));
         assertThat(results.getProblemAlarm(3), hasSeverity(OnmsSeverity.CLEARED));
         assertThat(results.getProblemAlarm(3), acknowledged());
-        assertThat(results.getResolutionAlarm(3), hasSeverity(OnmsSeverity.CLEARED));
+        assertThat(results.getResolutionAlarm(3), hasSeverity(OnmsSeverity.NORMAL));
         // t=∞
-        assertThat(results.getAlarms(-1), hasSize(0));
+        assertThat(results.getAlarmsAtLastKnownTime(), hasSize(0));
+
+        // Now verify the state changes for the particular alarms
+
+        // the problem
+        List<State> problemStates = results.getStateChangesForAlarmWithId(results.getProblemAlarm(1).getId());
+        assertThat(problemStates, hasSize(4)); // major, major+acked, cleared+acked, deleted
+        // state 0 at t=1
+        assertThat(problemStates.get(0).getTime(), equalTo(1L));
+        assertThat(problemStates.get(0).getAlarm(), hasSeverity(OnmsSeverity.MAJOR));
+        // state 1 at t=2
+        assertThat(problemStates.get(1).getTime(), equalTo(2L));
+        assertThat(problemStates.get(1).getAlarm(), hasSeverity(OnmsSeverity.MAJOR));
+        assertThat(problemStates.get(1).getAlarm(), acknowledged());
+        // state 2 at t=3
+        assertThat(problemStates.get(2).getTime(), equalTo(3L));
+        assertThat(problemStates.get(2).getAlarm(), hasSeverity(OnmsSeverity.CLEARED));
+        assertThat(problemStates.get(2).getAlarm(), acknowledged());
+        // state 3 at t in [23h,25h]
+        assertThat(problemStates.get(3).getTime(), greaterThanOrEqualTo(TimeUnit.HOURS.toMillis(23)));
+        assertThat(problemStates.get(3).getTime(), lessThan(TimeUnit.HOURS.toMillis(25)));
+        assertThat(problemStates.get(3).getAlarm(), nullValue()); // DELETED
     }
 
     /**
@@ -208,14 +240,31 @@ public class AlarmdNgIT {
         assertThat(results.getAlarms(0), hasSize(0));
         // t=1, a single problem alarm that is not yet acknowledged
         assertThat(results.getAlarms(1), hasSize(1));
-        assertThat(results.getProblemAlarm(1), hasSeverity(OnmsSeverity.WARNING));
+        assertThat(results.getProblemAlarm(1), hasSeverity(OnmsSeverity.MAJOR));
         assertThat(results.getProblemAlarm(1), not(acknowledged()));
         // t=2, a single problem alarm that is acknowledged
         assertThat(results.getAlarms(2), hasSize(1));
-        assertThat(results.getProblemAlarm(2), hasSeverity(OnmsSeverity.WARNING));
+        assertThat(results.getProblemAlarm(2), hasSeverity(OnmsSeverity.MAJOR));
         assertThat(results.getProblemAlarm(2), acknowledged());
         // t=∞
-        assertThat(results.getAlarms(-1), hasSize(0));
+        assertThat(results.getAlarmsAtLastKnownTime(), hasSize(0));
+
+        // Now verify the state changes for the particular alarms
+
+        // the problem
+        List<State> problemStates = results.getStateChangesForAlarmWithId(results.getProblemAlarm(1).getId());
+        assertThat(problemStates, hasSize(3)); // major, major+acked, deleted
+        // state 0 at t=1
+        assertThat(problemStates.get(0).getTime(), equalTo(1L));
+        assertThat(problemStates.get(0).getAlarm(), hasSeverity(OnmsSeverity.MAJOR));
+        // state 1 at t=2
+        assertThat(problemStates.get(1).getTime(), equalTo(2L));
+        assertThat(problemStates.get(1).getAlarm(), hasSeverity(OnmsSeverity.MAJOR));
+        assertThat(problemStates.get(1).getAlarm(), acknowledged());
+        // state 2 at t in [7d,9d]
+        assertThat(problemStates.get(2).getTime(), greaterThanOrEqualTo(TimeUnit.DAYS.toMillis(2)));
+        assertThat(problemStates.get(2).getTime(), lessThan(TimeUnit.DAYS.toMillis(9)));
+        assertThat(problemStates.get(2).getAlarm(), nullValue()); // DELETED
     }
 
     private ScenarioResults play(Scenario scenario) {

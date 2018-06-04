@@ -37,21 +37,14 @@ import org.opennms.netmgt.events.api.EventConstants;
 import org.opennms.netmgt.model.OnmsSeverity;
 import org.opennms.netmgt.model.events.EventBuilder;
 import org.opennms.netmgt.xml.event.AlarmData;
-import org.opennms.netmgt.xml.event.Event;
 
 public class Scenario {
 
-    private final List<Event> events;
     private final List<Action> actions;
 
     public Scenario(ScenarioBuilder builder) {
-        this.events = new ArrayList<>(builder.events);
-        this.events.sort(Comparator.comparing(Event::getTime));
         this.actions = new ArrayList<>(builder.actions);
-    }
-
-    public List<Event> getEvents() {
-        return events;
+        this.actions.sort(Comparator.comparing(Action::getTime));
     }
 
     public List<Action> getActions() {
@@ -63,7 +56,6 @@ public class Scenario {
     }
 
     public static class ScenarioBuilder {
-        private final List<Event> events = new ArrayList<>();
         private final List<Action> actions = new ArrayList<>();
 
         public ScenarioBuilder withNodeDownEvent(long time, int nodeId) {
@@ -79,7 +71,7 @@ public class Scenario {
 
             builder.setLogDest("logndisplay");
             builder.setLogMessage("testing");
-            events.add(builder.getEvent());
+            actions.add(new SendEventAction(builder.getEvent()));
             return this;
         }
 
@@ -97,16 +89,17 @@ public class Scenario {
 
             builder.setLogDest("logndisplay");
             builder.setLogMessage("testing");
-            events.add(builder.getEvent());
+            actions.add(new SendEventAction(builder.getEvent()));
+            return this;
+        }
+
+        public ScenarioBuilder withAcknowledgmentForNodeDownAlarm(long time, int nodeId) {
+            actions.add(new AcknowledgeAlarmAction("test", new Date(time), String.format("%s:%d", EventConstants.NODE_DOWN_EVENT_UEI, nodeId)));
             return this;
         }
 
         public Scenario build() {
             return new Scenario(this);
-        }
-
-        public ScenarioBuilder withAcknowledgmentForNodeDownAlarm(long time, int nodeId) {
-            return this;
         }
     }
 

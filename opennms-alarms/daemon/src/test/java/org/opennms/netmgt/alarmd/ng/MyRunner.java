@@ -28,10 +28,18 @@
 
 package org.opennms.netmgt.alarmd.ng;
 
-import java.util.Date;
+import org.junit.runner.Description;
+import org.junit.runner.Runner;
+import org.junit.runner.notification.RunNotifier;
 
-public interface Action {
-    Date getTime();
+public class MyRunner extends Runner {
+    @Override
+    public Description getDescription() {
+        return null;
+    }
 
-    void visit(ActionVisitor visitor);
+    @Override
+    public void run(RunNotifier notifier) {
+
+    }
 }

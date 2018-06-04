@@ -29,9 +29,27 @@
 package org.opennms.netmgt.alarmd.ng;
 
 import java.util.Date;
+import java.util.Objects;
 
-public interface Action {
-    Date getTime();
+public class AcknowledgeAlarmAction implements Action {
+    private final String ackUser;
+    private final Date ackTime;
+    private final String reductionKey;
 
-    void visit(ActionVisitor visitor);
+
+    public AcknowledgeAlarmAction(String ackUser, Date ackTime, String reductionKey) {
+        this.ackUser = Objects.requireNonNull(ackUser);
+        this.ackTime = Objects.requireNonNull(ackTime);
+        this.reductionKey = Objects.requireNonNull(reductionKey);
+    }
+
+    @Override
+    public Date getTime() {
+        return ackTime;
+    }
+
+    @Override
+    public void visit(ActionVisitor visitor) {
+        visitor.acknowledgeAlarm(ackUser, ackTime, (a) -> Objects.equals(reductionKey, a.getReductionKey()));
+    }
 }

@@ -188,8 +188,8 @@ public class AlarmManager implements AlarmLifecycleListener, AlarmService, Initi
     }
 
     @Override
-    public void clearAlarm(OnmsAlarm alarm, long currentTime) {
-        LOG.info("Clearing alarm with id: {} with severity: {}", alarm.getId(), alarm.getSeverity());
+    public void clearAlarm(OnmsAlarm alarm, long clearTime) {
+        LOG.info("Clearing alarm with id: {} with current severity: {} at: {}", alarm.getId(), alarm.getSeverity(), clearTime);
         // Perform action
         final OnmsAlarm updatedAlarm = transactionOperations.execute((t) -> {
             final OnmsAlarm alarmInTrans = alarmDao.get(alarm.getId());
@@ -198,7 +198,7 @@ public class AlarmManager implements AlarmLifecycleListener, AlarmService, Initi
                 return null;
             }
             alarmInTrans.setSeverity(OnmsSeverity.CLEARED);
-            alarmInTrans.setLastAutomationTime(new Date(currentTime));
+            alarmInTrans.setLastAutomationTime(new Date(clearTime));
             alarmDao.update(alarmInTrans);
             return alarmInTrans;
         });

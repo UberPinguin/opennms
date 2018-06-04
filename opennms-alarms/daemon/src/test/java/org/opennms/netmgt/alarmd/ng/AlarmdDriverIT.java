@@ -28,12 +28,12 @@
 
 package org.opennms.netmgt.alarmd.ng;
 
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.junit.After;
@@ -71,7 +71,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 })
 @JUnitConfigurationEnvironment(systemProperties = {"alarmd.pseudoclock=true"})
 @JUnitTemporaryDatabase(dirtiesContext=false,tempDbClass=MockDatabase.class)
-public class AlarmdDriverIT implements TemporaryDatabaseAware<MockDatabase> {
+public class AlarmdDriverIT implements TemporaryDatabaseAware<MockDatabase>, ActionVisitor {
 
     static Scenario SCENARIO;
     static ScenarioResults RESULTS;
@@ -104,6 +104,10 @@ public class AlarmdDriverIT implements TemporaryDatabaseAware<MockDatabase> {
         m_database = database;
     }
 
+    private final long tickLength = 1;
+
+    private ScenarioResults results = new ScenarioResults();
+
     @Before
     public void setUp() {
         // Async.
@@ -123,33 +127,23 @@ public class AlarmdDriverIT implements TemporaryDatabaseAware<MockDatabase> {
         m_alarmd.destroy();
     }
 
-    private final long tickLength = 1;
-
-    private long roundToTick(Date date) {
-        return Math.floorDiv(date.getTime(),tickLength) * tickLength;
-    }
 
     @Test
     public void canDriveScenario() {
-        SCENARIO = Scenario.builder()
-                .withNodeDownEvent(1, 1)
-                .withNodeUpEvent(2, 1)
-                .build();
-
-        ScenarioResults results = new ScenarioResults();
-        if (SCENARIO.getEvents().size() == 0) {
+        if (SCENARIO.getActions().size() == 0) {
             RESULTS = results;
             return;
         }
 
-        final Map<Long,List<Event>> eventsByTick = SCENARIO.getEvents().stream()
-                .collect(Collectors.groupingBy(e -> roundToTick(e.getTime())));
-        final long start = Math.max(SCENARIO.getEvents().stream()
-                .min(Comparator.comparing(Event::getTime))
+        final Map<Long,List<Action>> actionsByTick = SCENARIO.getActions().stream()
+                .collect(Collectors.groupingBy(a -> roundToTick(a.getTime())));
+
+        final long start = Math.max(SCENARIO.getActions().stream()
+                .min(Comparator.comparing(Action::getTime))
                 .map(e -> roundToTick(e.getTime()))
                 .get() - tickLength, 0);
-        final long end = SCENARIO.getEvents().stream()
-                .max(Comparator.comparing(Event::getTime))
+        final long end = SCENARIO.getActions().stream()
+                .max(Comparator.comparing(Action::getTime))
                 .map(e -> roundToTick(e.getTime()))
                 .get() + tickLength;
 
@@ -160,10 +154,11 @@ public class AlarmdDriverIT implements TemporaryDatabaseAware<MockDatabase> {
         }
 
         for (long now = start; now <= end; now += tickLength) {
-            final List<Event> events = eventsByTick.get(now);
-            if (events != null) {
-                for (Event e : events) {
-                    m_eventMgr.sendNow(e, true);
+            // Perform the actions
+            final List<Action> actions = actionsByTick.get(now);
+            if (actions != null) {
+                for (Action  a : actions) {
+                    a.visit(this);
                 }
             }
 
@@ -174,18 +169,48 @@ public class AlarmdDriverIT implements TemporaryDatabaseAware<MockDatabase> {
             results.addAlarms(now, m_alarmDao.findAll());
         }
 
-        // TODO: Split this up, and accelerate over time
+        // Tick every 5 minutes for the next 24 hours
+        tickAtRateUntil(TimeUnit.MINUTES.toMillis(5),
+                end,
+                end + TimeUnit.DAYS.toMillis(1));
 
+        // Tick every hour for the next week
+        tickAtRateUntil(TimeUnit.HOURS.toMillis(1),
+                end + TimeUnit.DAYS.toMillis(1),
+                end + TimeUnit.DAYS.toMillis(8));
+
+        RESULTS = results;
+    }
+
+    private void tickAtRateUntil(long tickLength, long start, long end) {
         // Now keep tick'ing at an accelerated rate for another week
-        final long newEnd = end + TimeUnit.DAYS.toMillis(7);
-        final long newTickLength = TimeUnit.MINUTES.toMillis(5);
-        for (long now = end; now < newEnd; now += newTickLength) {
+        for (long now = start; now <= end; now += tickLength) {
             // Tick
-            m_alarmManager.getClock().advanceTime(newTickLength, TimeUnit.MILLISECONDS);
+            m_alarmManager.getClock().advanceTime(tickLength, TimeUnit.MILLISECONDS);
             m_alarmManager.tick();
             results.addAlarms(now, m_alarmDao.findAll());
         }
+    }
 
-        RESULTS = results;
+    private long roundToTick(Date date) {
+        return Math.floorDiv(date.getTime(),tickLength) * tickLength;
+    }
+
+    @Override
+    public void sendEvent(Event e) {
+        m_eventMgr.sendNow(e, true);
+    }
+
+    @Override
+    public void acknowledgeAlarm(String ackUser, Date ackTime, Function<OnmsAlarm, Boolean> filter) {
+        m_transactionTemplate.execute((t) -> {
+            m_alarmDao.findAll().stream()
+                    .filter(filter::apply)
+                    .forEach(a -> {
+                        a.setAlarmAckUser(ackUser);
+                        a.setAlarmAckTime(ackTime);
+                    });
+            return null;
+        });
     }
 }

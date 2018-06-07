@@ -40,12 +40,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.opennms.netmgt.alarmd.api.AlarmLifecycleListener;
 import org.opennms.netmgt.alarmd.api.AlarmLifecycleSubscriptionService;
 import org.opennms.netmgt.dao.api.AlarmDao;
-import org.opennms.netmgt.events.api.EventConstants;
-import org.opennms.netmgt.events.api.annotations.EventHandler;
-import org.opennms.netmgt.events.api.annotations.EventListener;
 import org.opennms.netmgt.model.OnmsAlarm;
-import org.opennms.netmgt.xml.event.Event;
-import org.opennms.netmgt.xml.event.Parm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,7 +48,6 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallbackWithoutResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@EventListener(name="alarmLifecycleListenerManager", logPrefix="alarmd")
 public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscriptionService {
 
     private static final Logger LOG = LoggerFactory.getLogger(AlarmLifecycleListenerManager.class);
@@ -88,7 +82,6 @@ public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscription
             timer = null;
         }
     }
-
     private void doSnapshot() {
         rwLock.readLock().lock();
         try {
@@ -107,78 +100,24 @@ public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscription
         }
     }
 
-    @EventHandler(ueis = {
-            EventConstants.ALARM_CREATED_UEI,
-            EventConstants.ALARM_ESCALATED_UEI,
-            EventConstants.ALARM_CLEARED_UEI,
-            EventConstants.ALARM_UNCLEARED_UEI,
-            EventConstants.ALARM_UPDATED_WITH_REDUCED_EVENT_UEI,
-            EventConstants.ALARM_DELETED_EVENT_UEI
-    })
-    public void handleAlarmLifecycleEvents(Event e) {
+    public void onNewOrUpdatedAlarm(OnmsAlarm alarm) {
         rwLock.readLock().lock();
         try {
-            if (e == null || listeners.size() < 1) {
-                // Return quick if we weren't given an event, or if there are no listeners defined
-                // in which case we don't need to perform any further handling
-                return;
-            }
-
-            final Parm alarmIdParm = e.getParm(EventConstants.PARM_ALARM_ID);
-            if (alarmIdParm == null || alarmIdParm.getValue() == null) {
-                LOG.warn("The alarmId parameter has no value on event with uei: {}. Ignoring.", e.getUei());
-                return;
-            }
-
-            int alarmId;
-            try {
-                alarmId = Integer.parseInt(alarmIdParm.getValue().getContent());
-            } catch (NumberFormatException ee) {
-                LOG.warn("Failed to retrieve the alarmId for event with uei: {}. Ignoring.", e.getUei(), ee);
-                return;
-            }
-
-            if (EventConstants.ALARM_DELETED_EVENT_UEI.equals(e.getUei())) {
-                final Parm reductionKeyParm = e.getParm(EventConstants.PARM_ALARM_REDUCTION_KEY);
-                if (reductionKeyParm == null) {
-                    LOG.warn("Received alarm deleted event without reduction key. Ignoring.");
-                    return;
-                }
-                if (reductionKeyParm.getValue() == null) {
-                    LOG.warn("Received alarm deleted event with null reduction key value. Ignoring.");
-                    return;
-                }
-                final String reductionKey = reductionKeyParm.getValue().getContent();
-                if (reductionKey == null) {
-                    LOG.warn("Received alarm deleted event with null reduction key content. Ignoring.");
-                    return;
-                }
-
-                handleAlarmDeleted(alarmId, reductionKey);
-            } else {
-                handleAlarmCreatedOrUpdated(e, alarmId);
-            }
+            listeners.forEach(l -> l.handleNewOrUpdatedAlarm(alarm));
         } finally {
             rwLock.readLock().unlock();
         }
     }
 
-    private void handleAlarmCreatedOrUpdated(Event e, int alarmId) {
-        template.execute(new TransactionCallbackWithoutResult() {
-            @Override
-            protected void doInTransactionWithoutResult(TransactionStatus status) {
-                final OnmsAlarm alarm = alarmDao.get(alarmId);
-                if (alarm == null) {
-                    LOG.error("Could not find alarm with id: {} for event with uei: {}. Ignoring.", alarmId, e.getUei());
-                    return;
-                }
-                listeners.forEach(l -> l.handleNewOrUpdatedAlarm(alarm));
-            }
-        });
-    }
-
-    private void handleAlarmDeleted(int alarmId, String reductionKey) {
-        listeners.forEach(l -> l.handleDeletedAlarm(alarmId, reductionKey));
+    public void onAlarmDeleted(OnmsAlarm alarm) {
+        final Integer alarmId = alarm.getId();
+        final String reductionKey = alarm.getReductionKey();
+        rwLock.readLock().lock();
+        try {
+            listeners.forEach(l -> l.handleDeletedAlarm(alarmId, reductionKey));
+        } finally {
+            rwLock.readLock().unlock();
+        }
     }
 
     @Override
@@ -200,4 +139,5 @@ public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscription
             rwLock.writeLock().unlock();
         }
     }
+
 }

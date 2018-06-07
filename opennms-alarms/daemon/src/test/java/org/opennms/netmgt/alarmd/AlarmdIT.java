@@ -172,12 +172,12 @@ public class AlarmdIT implements TemporaryDatabaseAware<MockDatabase>, Initializ
     }
 
     @Override
-    public void afterPropertiesSet() throws Exception {
+    public void afterPropertiesSet() {
         BeanUtils.assertAutowiring(this);
     }
 
     @Before
-    public void setUp() throws Exception {
+    public void setUp() {
         m_mockNetwork.createStandardNetwork();
 
         m_eventdIpcMgr.setEventWriter(m_database);
@@ -194,7 +194,7 @@ public class AlarmdIT implements TemporaryDatabaseAware<MockDatabase>, Initializ
     }
 
     @After
-    public void tearDown() throws Exception {
+    public void tearDown() {
         m_alarmd.destroy();
     }
 
@@ -317,7 +317,7 @@ public class AlarmdIT implements TemporaryDatabaseAware<MockDatabase>, Initializ
 
         rowCount = m_jdbcTemplate.queryForObject("select count(*) from events where alarmid is null", Integer.class).intValue();
         MockUtil.println(String.valueOf(rowCount) + " of events with null alarmid");
-        assertEquals(10, rowCount);
+        assertEquals(0, rowCount);
 
     }
 
@@ -326,7 +326,7 @@ public class AlarmdIT implements TemporaryDatabaseAware<MockDatabase>, Initializ
         ThrowableAnticipator ta = new ThrowableAnticipator();
         ta.anticipate(new NullPointerException("Cannot create alarm from null event."));
         try {
-            m_alarmd.getPersister().persist(null, true);
+            m_alarmd.getPersister().persist(null);
         } catch (Throwable t) {
             ta.throwableReceived(t);
         }
@@ -354,14 +354,14 @@ public class AlarmdIT implements TemporaryDatabaseAware<MockDatabase>, Initializ
     
 
     @Test
-    public void testNoLogmsg() throws Exception {
+    public void testNoLogmsg() {
         EventBuilder bldr = new EventBuilder("testNoLogmsg", "AlarmdTest");
         bldr.setAlarmData(new AlarmData());
 
         ThrowableAnticipator ta = new ThrowableAnticipator();
         ta.anticipate(new IllegalArgumentException("Incoming event has an illegal dbid (0), aborting"));
         try {
-            m_alarmd.getPersister().persist(bldr.getEvent(), false);
+            m_alarmd.getPersister().persist(bldr.getEvent());
         } catch (Throwable t) {
             ta.throwableReceived(t);
         }
@@ -369,15 +369,15 @@ public class AlarmdIT implements TemporaryDatabaseAware<MockDatabase>, Initializ
     }
 
     @Test
-    public void testNoAlarmData() throws Exception {
+    public void testNoAlarmData() {
         EventBuilder bldr = new EventBuilder("testNoAlarmData", "AlarmdTest");
         bldr.setLogMessage(null);
 
-        m_alarmd.getPersister().persist(bldr.getEvent(), false);
+        m_alarmd.getPersister().persist(bldr.getEvent());
     }
 
     @Test
-    public void testNoDbid() throws Exception {
+    public void testNoDbid() {
         EventBuilder bldr = new EventBuilder("testNoDbid", "AlarmdTest");
         bldr.setLogMessage(null);
         bldr.setAlarmData(new AlarmData());
@@ -385,7 +385,7 @@ public class AlarmdIT implements TemporaryDatabaseAware<MockDatabase>, Initializ
         ThrowableAnticipator ta = new ThrowableAnticipator();
         ta.anticipate(new IllegalArgumentException("Incoming event has an illegal dbid (0), aborting"));
         try {
-            m_alarmd.getPersister().persist(bldr.getEvent(), false);
+            m_alarmd.getPersister().persist(bldr.getEvent());
         } catch (Throwable t) {
             ta.throwableReceived(t);
         }
@@ -393,7 +393,7 @@ public class AlarmdIT implements TemporaryDatabaseAware<MockDatabase>, Initializ
     }
     
     @Test
-    public void changeFields() throws InterruptedException, SQLException {
+    public void changeFields() throws SQLException {
         assertEmptyAlarmTable();
 
         String reductionKey = "testUpdateField";
@@ -662,7 +662,7 @@ public class AlarmdIT implements TemporaryDatabaseAware<MockDatabase>, Initializ
         m_eventdIpcMgr.sendNow(event.getEvent());
     }
 
-    private void sendNodeDownEventWithUpdateFieldSeverity(String reductionKey, MockNode node, OnmsSeverity severity) throws SQLException {
+    private void sendNodeDownEventWithUpdateFieldSeverity(String reductionKey, MockNode node, OnmsSeverity severity) {
         EventBuilder event = MockEventUtil.createNodeDownEventBuilder("Test", node);
 
         if (reductionKey != null) {

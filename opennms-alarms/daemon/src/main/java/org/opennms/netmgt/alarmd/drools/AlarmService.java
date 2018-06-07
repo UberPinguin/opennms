@@ -26,18 +26,20 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.netmgt.alarmd;
+package org.opennms.netmgt.alarmd.drools;
+
+import java.util.Date;
 
 import org.opennms.netmgt.model.OnmsAlarm;
 
-public interface AlarmService extends AlarmTicketerService {
+public interface AlarmService {
 
-    void clearAlarm(OnmsAlarm alarm, long currentTime);
+    void clearAlarm(OnmsAlarm alarm, Date clearTime);
 
     void deleteAlarm(OnmsAlarm alarm);
 
     void unclearAlarm(OnmsAlarm alarm);
 
-    void ackAlarmAndCreateTicket(OnmsAlarm alarm);
+    void acknowledgeAlarm(OnmsAlarm alarm);
 
 }

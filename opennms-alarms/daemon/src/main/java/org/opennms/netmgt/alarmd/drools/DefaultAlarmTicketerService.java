@@ -26,7 +26,7 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.netmgt.alarmd;
+package org.opennms.netmgt.alarmd.drools;
 
 import org.opennms.netmgt.model.OnmsAlarm;
 
@@ -38,7 +38,7 @@ public class DefaultAlarmTicketerService implements AlarmTicketerService {
     }
 
     @Override
-    public void createTicket(OnmsAlarm alarm) {
+    public void  ackAlarmAndCreateTicket(OnmsAlarm alarm) {
 
     }
 

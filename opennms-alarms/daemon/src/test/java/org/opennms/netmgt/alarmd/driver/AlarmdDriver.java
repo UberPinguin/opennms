@@ -44,8 +44,8 @@ import org.opennms.core.test.OpenNMSJUnit4ClassRunner;
 import org.opennms.core.test.db.MockDatabase;
 import org.opennms.core.test.db.TemporaryDatabaseAware;
 import org.opennms.core.test.db.annotations.JUnitTemporaryDatabase;
-import org.opennms.netmgt.alarmd.AlarmManager;
 import org.opennms.netmgt.alarmd.Alarmd;
+import org.opennms.netmgt.alarmd.drools.DroolsAlarmContext;
 import org.opennms.netmgt.dao.api.AlarmDao;
 import org.opennms.netmgt.dao.api.MonitoringLocationDao;
 import org.opennms.netmgt.dao.api.NodeDao;
@@ -97,7 +97,7 @@ public class AlarmdDriver implements TemporaryDatabaseAware<MockDatabase>, Actio
     private MockDatabase m_database;
 
     @Autowired
-    private AlarmManager m_alarmManager;
+    private DroolsAlarmContext m_droolsAlarmContext;
 
     @Override
     public void setTemporaryDatabase(final MockDatabase database) {
@@ -124,7 +124,9 @@ public class AlarmdDriver implements TemporaryDatabaseAware<MockDatabase>, Actio
         m_nodeDao.save(node);
 
         // Use a pseudo-clock
-        m_alarmManager.setUsePseudoClock(true);
+        m_droolsAlarmContext.setUsePseudoClock(true);
+        // Drive the ticks ourselves
+        m_droolsAlarmContext.setUseManualTick(true);
 
         // Start alarmd
         m_alarmd.start();
@@ -155,8 +157,8 @@ public class AlarmdDriver implements TemporaryDatabaseAware<MockDatabase>, Actio
 
         if (start > 0) {
             // Tick
-            m_alarmManager.getClock().advanceTime(tickLength, TimeUnit.MILLISECONDS);
-            m_alarmManager.tick();
+            m_droolsAlarmContext.getClock().advanceTime(tickLength, TimeUnit.MILLISECONDS);
+            m_droolsAlarmContext.tick();
         }
 
         for (long now = start; now <= end; now += tickLength) {
@@ -169,8 +171,8 @@ public class AlarmdDriver implements TemporaryDatabaseAware<MockDatabase>, Actio
             }
 
             // Tick
-            m_alarmManager.getClock().advanceTime(tickLength, TimeUnit.MILLISECONDS);
-            m_alarmManager.tick();
+            m_droolsAlarmContext.getClock().advanceTime(tickLength, TimeUnit.MILLISECONDS);
+            m_droolsAlarmContext.tick();
 
             results.addAlarms(now, m_alarmDao.findAll());
         }
@@ -190,8 +192,8 @@ public class AlarmdDriver implements TemporaryDatabaseAware<MockDatabase>, Actio
         // Now keep tick'ing at an accelerated rate for another week
         for (long now = start; now <= end; now += tickLength) {
             // Tick
-            m_alarmManager.getClock().advanceTime(tickLength, TimeUnit.MILLISECONDS);
-            m_alarmManager.tick();
+            m_droolsAlarmContext.getClock().advanceTime(tickLength, TimeUnit.MILLISECONDS);
+            m_droolsAlarmContext.tick();
             results.addAlarms(now, m_alarmDao.findAll());
         }
     }

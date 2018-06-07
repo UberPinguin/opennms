@@ -37,22 +37,19 @@ import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 
 import org.hibernate.Hibernate;
+import org.opennms.netmgt.dao.api.AlarmEntityNotifier;
 import org.opennms.netmgt.dao.api.AlarmDao;
 import org.opennms.netmgt.dao.api.EventDao;
 import org.opennms.netmgt.eventd.EventUtil;
-import org.opennms.netmgt.events.api.EventConstants;
-import org.opennms.netmgt.events.api.EventForwarder;
 import org.opennms.netmgt.model.OnmsAlarm;
 import org.opennms.netmgt.model.OnmsEvent;
 import org.opennms.netmgt.model.OnmsSeverity;
-import org.opennms.netmgt.model.events.EventBuilder;
 import org.opennms.netmgt.xml.event.Event;
 import org.opennms.netmgt.xml.event.UpdateField;
 import org.opennms.netmgt.xml.eventconf.LogDestType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.transaction.support.TransactionOperations;
 
 import com.google.common.util.concurrent.Striped;
@@ -74,8 +71,6 @@ public class AlarmPersisterImpl implements AlarmPersister {
     @Autowired
     private EventDao m_eventDao;
 
-    private EventForwarder m_eventForwarder;
-
     @Autowired
     private EventUtil m_eventUtil;
 
@@ -83,7 +78,7 @@ public class AlarmPersisterImpl implements AlarmPersister {
     private TransactionOperations m_transactionOperations;
 
     @Autowired
-    private AlarmManager m_alarmManager;
+    private AlarmEntityNotifier m_alarmEntityNotifier;
 
     private Striped<Lock> lockStripes = StripedExt.fairLock(NUM_STRIPE_LOCKS);
 
@@ -108,7 +103,7 @@ public class AlarmPersisterImpl implements AlarmPersister {
     /** {@inheritDoc} 
      * @return */
     @Override
-    public OnmsAlarm persist(Event event, boolean eagerlyLoadAlarm) {
+    public OnmsAlarm persist(Event event) {
         Objects.requireNonNull(event, "Cannot create alarm from null event.");
         if (!checkEventSanityAndDoWeProcess(event)) {
             return null;
@@ -122,25 +117,19 @@ public class AlarmPersisterImpl implements AlarmPersister {
         // We do this to ensure that clears and triggers are processed in the same order
         // as the calls are made
         final Iterable<Lock> locks = lockStripes.bulkGet(getLockKeys(event));
-        final OnmsAlarmAndLifecycleEvent alarmAndEvent;
+        final OnmsAlarm alarm;
         try {
             locks.forEach(Lock::lock);
             // Process the alarm inside a transaction
-            alarmAndEvent = m_transactionOperations.execute((action) -> addOrReduceEventAsAlarm(event, eagerlyLoadAlarm));
+            alarm = m_transactionOperations.execute((action) -> addOrReduceEventAsAlarm(event));
         } finally {
             locks.forEach(Lock::unlock);
         }
 
-        // Send the event outside of the database transaction
-        m_eventForwarder.sendNow(alarmAndEvent.getEvent());
-
-        // Notify the lifecycle manager
-        m_alarmManager.handleNewOrUpdatedAlarm(alarmAndEvent.getAlarm());
-
-        return alarmAndEvent.getAlarm();
+        return alarm;
     }
 
-    private OnmsAlarmAndLifecycleEvent addOrReduceEventAsAlarm(Event event, boolean eagerlyLoadAlarm) {
+    private OnmsAlarm addOrReduceEventAsAlarm(Event event) {
         final OnmsEvent e = m_eventDao.get(event.getDbid());
         if (e == null) {
             throw new IllegalStateException("Event with id " + event.getDbid() + " was deleted before we could retrieve it and create an alarm.");
@@ -150,7 +139,6 @@ public class AlarmPersisterImpl implements AlarmPersister {
         LOG.debug("addOrReduceEventAsAlarm: looking for existing reduction key: {}", reductionKey);
         OnmsAlarm alarm = m_alarmDao.findByReductionKey(reductionKey);
 
-        final EventBuilder ebldr;
         if (alarm == null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("addOrReduceEventAsAlarm: reductionKey:{} not found, instantiating new alarm", reductionKey);
@@ -160,7 +148,7 @@ public class AlarmPersisterImpl implements AlarmPersister {
             m_alarmDao.save(alarm);
             m_eventDao.saveOrUpdate(e);
 
-            ebldr = new EventBuilder(EventConstants.ALARM_CREATED_UEI, Alarmd.NAME);
+            m_alarmEntityNotifier.didCreateAlarm(alarm);
         } else {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("addOrReduceEventAsAlarm: reductionKey:{} found, reducing event to existing alarm: {}", reductionKey, alarm.getIpAddr());
@@ -173,24 +161,9 @@ public class AlarmPersisterImpl implements AlarmPersister {
                 m_eventDao.deletePreviousEventsForAlarm(alarm.getId(), e);
             }
 
-            ebldr = new EventBuilder(EventConstants.ALARM_UPDATED_WITH_REDUCED_EVENT_UEI, Alarmd.NAME);
+            m_alarmEntityNotifier.didUpdateAlarmWithReducedEvent(alarm);
         }
-
-        if (eagerlyLoadAlarm) {
-            // Load fields which are known to be used by the NBIs
-            if (alarm.getServiceType() != null) {
-                alarm.getServiceType().getName(); // To avoid potential LazyInitializationException when dealing with NorthboundAlarm
-            }
-            if (alarm.getNodeId() != null) {
-                alarm.getNode().getForeignSource(); // This should trigger the lazy loading of the node object, to properly populate the NorthboundAlarm class.
-            }
-            Hibernate.initialize(alarm.getEventParameters());
-        }
-
-        ebldr.addParam(EventConstants.PARM_ALARM_UEI, alarm.getUei());
-        ebldr.addParam(EventConstants.PARM_ALARM_ID, alarm.getId());
-
-        return new OnmsAlarmAndLifecycleEvent(alarm, ebldr.getEvent());
+        return alarm;
     }
 
     private void reduceEvent(OnmsEvent e, OnmsAlarm alarm, Event event) {
@@ -391,19 +364,12 @@ public class AlarmPersisterImpl implements AlarmPersister {
         return m_eventUtil;
     }
 
-    public void setEventForwarder(EventForwarder eventForwarder) {
-        m_eventForwarder = eventForwarder;
+    public AlarmEntityNotifier getAlarmChangeListener() {
+        return m_alarmEntityNotifier;
     }
 
-    public EventForwarder getEventForwarder() {
-        return m_eventForwarder;
+    public void setAlarmChangeListener(AlarmEntityNotifier alarmEntityNotifier) {
+        m_alarmEntityNotifier = alarmEntityNotifier;
     }
 
-    public AlarmManager getAlarmManager() {
-        return m_alarmManager;
-    }
-
-    public void setAlarmManager(AlarmManager alarmManager) {
-        m_alarmManager = alarmManager;
-    }
 }

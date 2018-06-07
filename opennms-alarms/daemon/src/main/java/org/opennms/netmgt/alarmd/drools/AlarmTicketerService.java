@@ -26,7 +26,7 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.netmgt.alarmd;
+package org.opennms.netmgt.alarmd.drools;
 
 import org.opennms.netmgt.model.OnmsAlarm;
 
@@ -34,7 +34,7 @@ public interface AlarmTicketerService {
 
     boolean isTicketingEnabled();
 
-    void createTicket(OnmsAlarm alarm);
+    void ackAlarmAndCreateTicket(OnmsAlarm alarm);
 
     void updateTicket(OnmsAlarm alarm);
 

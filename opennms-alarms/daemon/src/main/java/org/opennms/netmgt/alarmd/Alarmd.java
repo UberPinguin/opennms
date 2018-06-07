@@ -28,29 +28,15 @@
 
 package org.opennms.netmgt.alarmd;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
-import org.opennms.netmgt.alarmd.api.NorthboundAlarm;
-import org.opennms.netmgt.alarmd.api.Northbounder;
-import org.opennms.netmgt.alarmd.api.NorthbounderException;
+import org.opennms.netmgt.alarmd.drools.DroolsAlarmContext;
 import org.opennms.netmgt.daemon.AbstractServiceDaemon;
-import org.opennms.netmgt.events.api.EventConstants;
-import org.opennms.netmgt.events.api.EventProxy;
-import org.opennms.netmgt.events.api.EventProxyException;
 import org.opennms.netmgt.events.api.ThreadAwareEventListener;
 import org.opennms.netmgt.events.api.annotations.EventHandler;
 import org.opennms.netmgt.events.api.annotations.EventListener;
-import org.opennms.netmgt.model.OnmsAlarm;
-import org.opennms.netmgt.model.events.EventBuilder;
 import org.opennms.netmgt.xml.event.Event;
-import org.opennms.netmgt.xml.event.Parm;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 
 /**
  * Alarm management Daemon
@@ -67,22 +53,16 @@ public class Alarmd extends AbstractServiceDaemon implements ThreadAwareEventLis
 
     protected static final Integer THREADS = Integer.getInteger("org.opennms.alarmd.threads", 4);
 
-    private List<Northbounder> m_northboundInterfaces = new ArrayList<>();
-
-    private volatile boolean m_hasActiveAlarmNbis = false;
-
     private AlarmPersister m_persister;
-
-    /** The event proxy. */
-    @Autowired
-    @Qualifier("eventProxy")
-    private EventProxy m_eventProxy;
 
     @Autowired
     private AlarmLifecycleListenerManager m_alm;
 
     @Autowired
-    private AlarmManager m_alarmManager;
+    private DroolsAlarmContext m_droolsAlarmContext;
+
+    @Autowired
+    private NorthbounderManager m_northbounderManager;
 
     public Alarmd() {
         super(NAME);
@@ -101,76 +81,12 @@ public class Alarmd extends AbstractServiceDaemon implements ThreadAwareEventLis
            handleReloadEvent(e);
            return;
     	}
-
-    	// If there are 1+ NBIs we need to invoke, make sure the alarm
-        // object that is returned is eagerly loaded (and avoid any
-        // LazyInitializationExceptions). Otherwise, we can save resources
-        // by not having to load these fields.
-        final OnmsAlarm alarm = m_persister.persist(e, m_hasActiveAlarmNbis);
-
-        if (alarm != null && m_hasActiveAlarmNbis) {
-            forwardAlarmToNbis(alarm);
-        }
-    }
-
-    /**
-     * Forwards the alarms to the current set of NBIs.
-     *
-     * This method is synchronized since the event handler is multi-threaded
-     * and the NBIs are not necessarily thread safe.
-     *
-     * @param alarm the alarm to forward
-     */
-    private synchronized void forwardAlarmToNbis(OnmsAlarm alarm) {
-        NorthboundAlarm a = new NorthboundAlarm(alarm);
-        for (Northbounder nbi : m_northboundInterfaces) {
-            nbi.onAlarm(a);
-        }
+    	m_persister.persist(e);
     }
 
     private synchronized void handleReloadEvent(Event e) {
         LOG.info("Received reload configuration event: {}", e);
-
-        //Currently, Alarmd has no configuration... I'm sure this will change soon.
-
-        List<Parm> parmCollection = e.getParmCollection();
-        for (Parm parm : parmCollection) {
-
-            String parmName = parm.getParmName();
-            if ("daemonName".equals(parmName)) {
-                if (parm.getValue() == null || parm.getValue().getContent() == null) {
-                    LOG.warn("The daemonName parameter has no value, ignoring.");
-                    return;
-                }
-
-                List<Northbounder> nbis = getNorthboundInterfaces();
-                for (Northbounder nbi : nbis) {
-                    if (parm.getValue().getContent().contains(nbi.getName())) {
-                        LOG.debug("Handling reload event for NBI: {}", nbi.getName());
-                        LOG.debug("Reloading NBI configuration for interface {} not yet implemented.", nbi.getName());
-                        EventBuilder ebldr = null;
-                        try {
-                            nbi.reloadConfig();
-                            ebldr = new EventBuilder(EventConstants.RELOAD_DAEMON_CONFIG_SUCCESSFUL_UEI, getName());
-                            ebldr.addParam(EventConstants.PARM_DAEMON_NAME, getName());
-                        } catch (NorthbounderException ex) {
-                            LOG.error("Can't reload the northbound configuration for " + nbi.getName(), ex);
-                            ebldr = new EventBuilder(EventConstants.RELOAD_DAEMON_CONFIG_FAILED_UEI, getName());
-                            ebldr.addParam(EventConstants.PARM_DAEMON_NAME, getName());
-                            ebldr.addParam(EventConstants.PARM_REASON, ex.getMessage());
-                        } finally {
-                            if (ebldr != null)
-                                try {
-                                    m_eventProxy.send(ebldr.getEvent());
-                                } catch (EventProxyException ep) {
-                                    LOG.error("Can't send reload status event", ep);
-                                }
-                        }
-                        return;
-                    }
-                }
-            }
-        }
+        m_northbounderManager.handleReloadEvent(e);
     }
 
 	/**
@@ -200,53 +116,18 @@ public class Alarmd extends AbstractServiceDaemon implements ThreadAwareEventLis
     public synchronized void onStart() {
         // Start the ALM
         m_alm.start();
-        // Start the manager
-        m_alarmManager.start();
+        // Start the Drools context
+        m_droolsAlarmContext.start();
     }
 
     @Override
     public synchronized void onStop() {
-        // On shutdown, stop all of the NBIs
-        m_northboundInterfaces.forEach(nb -> {
-            LOG.debug("destroy: stopping {}", nb.getName());
-            nb.stop();
-        });
+        // Stop the northbound interfaces
+        m_northbounderManager.stop();
         // Stop the ALM
         m_alm.stop();
-        // Stop the manager
-        m_alarmManager.stop();
-    }
-
-    public synchronized void onNorthbounderRegistered(final Northbounder northbounder, final Map<String,String> properties) {
-        LOG.debug("onNorthbounderRegistered: starting {}", northbounder.getName());
-        northbounder.start();
-        m_northboundInterfaces.add(northbounder);
-        onNorthboundersChanged();
-    }
-
-    public synchronized void onNorthbounderUnregistered(final Northbounder northbounder, final Map<String,String> properties) {
-        LOG.debug("onNorthbounderUnregistered: stopping {}", northbounder.getName());
-        northbounder.stop();
-        m_northboundInterfaces.remove(northbounder);
-        onNorthboundersChanged();
-    }
-
-    private void onNorthboundersChanged() {
-        final long numNbisActive = m_northboundInterfaces.stream()
-                .filter(Northbounder::isReady)
-                .count();
-        m_hasActiveAlarmNbis = numNbisActive > 0;
-        LOG.debug("handleNorthboundersChanged: {} out of {} NBIs are currently active.",
-                numNbisActive, m_northboundInterfaces.size());
-    }
-
-    public synchronized List<Northbounder> getNorthboundInterfaces() {
-        return Collections.unmodifiableList(m_northboundInterfaces);
-    }
-
-    public synchronized void setNorthboundInterfaces(List<Northbounder> northboundInterfaces) {
-        m_northboundInterfaces = northboundInterfaces;
-        onNorthboundersChanged();
+        // Stop the Drools context
+        m_droolsAlarmContext.stop();
     }
 
     @Override

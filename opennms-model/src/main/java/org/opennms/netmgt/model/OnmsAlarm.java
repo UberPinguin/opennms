@@ -456,6 +456,7 @@ public class OnmsAlarm implements Acknowledgeable, Serializable {
      *
      * @return a {@link org.opennms.netmgt.model.OnmsSeverity} object.
      */
+    @Override
     @Column(name="severity", nullable=false)
     // @Enumerated(EnumType.ORDINAL)
     @Type(type="org.opennms.netmgt.model.OnmsSeverityUserType")

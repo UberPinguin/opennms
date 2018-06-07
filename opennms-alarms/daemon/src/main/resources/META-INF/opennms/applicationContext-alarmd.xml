@@ -12,13 +12,21 @@
   <context:annotation-config />
   <tx:annotation-driven />
 
-  <bean id="defaultAlarmTicketerService" class="org.opennms.netmgt.alarmd.DefaultAlarmTicketerService" />
+  <!-- Alarm notifier bridge -->
 
-  <bean id="alarmManager" class="org.opennms.netmgt.alarmd.AlarmManager" />
+  <bean id="defaultAlarmEntityNotifier" class="org.opennms.netmgt.alarmd.DefaultAlarmEntityNotifier" />
 
-  <bean id="alarmPersister" class="org.opennms.netmgt.alarmd.AlarmPersisterImpl" >
-    <property name="eventForwarder" ref="eventForwarder"/>
-  </bean>
+  <!-- Drools integration -->
+
+  <bean id="defaultAlarmTicketer" class="org.opennms.netmgt.alarmd.drools.DefaultAlarmService" />
+
+  <bean id="defaultAlarmTicketerService" class="org.opennms.netmgt.alarmd.drools.DefaultAlarmTicketerService" />
+
+  <bean id="droolsAlarmContext" class="org.opennms.netmgt.alarmd.drools.DroolsAlarmContext" />
+
+  <!-- Daemon -->
+
+  <bean id="alarmPersister" class="org.opennms.netmgt.alarmd.AlarmPersisterImpl" />
 
   <bean id="daemon" class="org.opennms.netmgt.alarmd.Alarmd" >
     <property name="persister" ref="alarmPersister" />
@@ -29,16 +37,17 @@
     <property name="eventSubscriptionService" ref="eventSubscriptionService" />
   </bean>
 
+  <!-- Northbounders -->
+
+  <bean id="northbounderManager" class="org.opennms.netmgt.alarmd.NorthbounderManager" />
+
   <onmsgi:list id="northbounderList" interface="org.opennms.netmgt.alarmd.api.Northbounder">
-    <onmsgi:listener ref="daemon" bind-method="onNorthbounderRegistered" unbind-method="onNorthbounderUnregistered" />
+    <onmsgi:listener ref="northbounderManager" bind-method="onNorthbounderRegistered" unbind-method="onNorthbounderUnregistered" />
   </onmsgi:list>
 
-  <bean id="alarmLifecycleListenerManager" class="org.opennms.netmgt.alarmd.AlarmLifecycleListenerManager" />
+  <!-- Lifecycle listeners -->
 
-  <bean id="alarmLifecycleListenerManagerListener" class="org.opennms.netmgt.events.api.AnnotationBasedEventListenerAdapter">
-    <property name="annotatedListener" ref="alarmLifecycleListenerManager" />
-    <property name="eventSubscriptionService" ref="eventSubscriptionService" />
-  </bean>
+  <bean id="alarmLifecycleListenerManager" class="org.opennms.netmgt.alarmd.AlarmLifecycleListenerManager" />
 
   <onmsgi:service interface="org.opennms.netmgt.alarmd.api.AlarmLifecycleSubscriptionService" ref="alarmLifecycleListenerManager"/>
 

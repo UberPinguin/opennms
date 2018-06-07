@@ -197,7 +197,6 @@ public class AlarmLifecycleListenerManagerIT implements TemporaryDatabaseAware<M
             }
         });
 
-
         await().until(getNodeDownAlarmFor(1), nullValue());
     }
 

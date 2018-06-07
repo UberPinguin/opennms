@@ -30,16 +30,22 @@ package org.opennms.netmgt.alarmd;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
 import org.opennms.netmgt.alarmd.api.NorthboundAlarm;
 import org.opennms.netmgt.alarmd.api.Northbounder;
 import org.opennms.netmgt.alarmd.api.NorthbounderException;
+import org.opennms.netmgt.dao.api.AlarmEntityListener;
+import org.opennms.netmgt.dao.api.DefaultAlarmEntityListener;
 import org.opennms.netmgt.events.api.EventConstants;
 import org.opennms.netmgt.events.api.EventProxy;
 import org.opennms.netmgt.events.api.EventProxyException;
 import org.opennms.netmgt.model.OnmsAlarm;
+import org.opennms.netmgt.model.OnmsMemo;
+import org.opennms.netmgt.model.OnmsReductionKeyMemo;
+import org.opennms.netmgt.model.OnmsSeverity;
 import org.opennms.netmgt.model.events.EventBuilder;
 import org.opennms.netmgt.xml.event.Event;
 import org.opennms.netmgt.xml.event.Parm;
@@ -48,7 +54,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
-public class NorthbounderManager {
+public class NorthbounderManager extends DefaultAlarmEntityListener {
     private static final Logger LOG = LoggerFactory.getLogger(NorthbounderManager.class);
 
     private List<Northbounder> m_northboundInterfaces = new ArrayList<>();
@@ -59,6 +65,16 @@ public class NorthbounderManager {
     @Autowired
     @Qualifier("eventProxy")
     private EventProxy m_eventProxy;
+
+    @Override
+    public void onAlarmCreated(OnmsAlarm alarm) {
+        forwardAlarmToNbis(alarm);
+    }
+
+    @Override
+    public void onAlarmUpdatedWithReducedEvent(OnmsAlarm alarm) {
+        forwardAlarmToNbis(alarm);
+    }
 
     /**
      * Forwards the alarms to the current set of NBIs.
@@ -163,4 +179,5 @@ public class NorthbounderManager {
             }
         }
     }
+
 }

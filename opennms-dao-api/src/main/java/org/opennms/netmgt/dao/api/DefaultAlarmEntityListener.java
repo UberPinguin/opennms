@@ -35,38 +35,54 @@ import org.opennms.netmgt.model.OnmsMemo;
 import org.opennms.netmgt.model.OnmsReductionKeyMemo;
 import org.opennms.netmgt.model.OnmsSeverity;
 
-/**
- * This interface provide functions that should be called
- * immediately after changing the alarm entities while maintaining
- * an open transaction.
- *
- * The implementation should in turn notify any interested listeners
- * i.e. northbounders, correlation engines, etc... about the state change.
- *
- * The implementation should be thread safe.
- *
- * @author jwhite
- */
-public interface AlarmEntityNotifier {
+public class DefaultAlarmEntityListener implements AlarmEntityListener {
+    @Override
+    public void onAlarmCreated(OnmsAlarm alarm) {
 
-    void didCreateAlarm(OnmsAlarm alarm);
+    }
 
-    void didUpdateAlarmWithReducedEvent(OnmsAlarm alarm);
+    @Override
+    public void onAlarmUpdatedWithReducedEvent(OnmsAlarm alarm) {
 
-    void didAcknowledgeAlarm(OnmsAlarm alarm, String previousAckUser, Date previousAckTime);
+    }
 
-    void didUnacknowledgeAlarm(OnmsAlarm alarm, String previousAckUser, Date previousAckTime);
+    @Override
+    public void onAlarmAcknowledged(OnmsAlarm alarm, String previousAckUser, Date previousAckTime) {
 
-    void didUpdateAlarmSeverity(OnmsAlarm alarm, OnmsSeverity previousSeverity);
+    }
 
-    void didDeleteAlarm(OnmsAlarm alarm);
+    @Override
+    public void onAlarmUnacknowledged(OnmsAlarm alarm, String previousAckUser, Date previousAckTime) {
 
-    void didUpdateStickyMemo(OnmsAlarm onmsAlarm, String previousBody, String previousAuthor, Date previousUpdated);
+    }
 
-    void didUpdateReductionKeyMemo(OnmsAlarm onmsAlarm, String previousBody, String previousAuthor, Date previousUpdated);
+    @Override
+    public void onAlarmSeverityUpdated(OnmsAlarm alarm, OnmsSeverity previousSeverity) {
 
-    void didDeleteStickyMemo(OnmsAlarm onmsAlarm, OnmsMemo memo);
+    }
 
-    void didDeleteReductionKeyMemo(OnmsAlarm onmsAlarm, OnmsReductionKeyMemo memo);
+    @Override
+    public void onAlarmDeleted(OnmsAlarm alarm) {
 
+    }
+
+    @Override
+    public void onStickyMemoUpdated(OnmsAlarm onmsAlalarmarm, String previousBody, String previousAuthor, Date previousUpdated) {
+
+    }
+
+    @Override
+    public void onReductionKeyMemoUpdated(OnmsAlarm alarm, String previousBody, String previousAuthor, Date previousUpdated) {
+
+    }
+
+    @Override
+    public void onStickyMemoDeleted(OnmsAlarm alarm, OnmsMemo memo) {
+
+    }
+
+    @Override
+    public void onReductionKeyMemoDeleted(OnmsAlarm alarm, OnmsReductionKeyMemo memo) {
+
+    }
 }

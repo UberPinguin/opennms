@@ -39,6 +39,7 @@ import static org.mockito.Mockito.when;
 import static org.opennms.netmgt.alarmd.driver.AlarmMatchers.hasSeverity;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,8 +51,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.opennms.netmgt.alarmd.AlarmLifecycleListenerManager;
-import org.opennms.netmgt.alarmd.DefaultAlarmEntityNotifier;
 import org.opennms.netmgt.dao.api.AlarmDao;
+import org.opennms.netmgt.dao.support.AlarmEntityNotifierImpl;
 import org.opennms.netmgt.events.api.EventForwarder;
 import org.opennms.netmgt.model.OnmsAlarm;
 import org.opennms.netmgt.model.OnmsEvent;
@@ -85,8 +86,8 @@ public class DroolsAlarmContextIT {
         dac.setUsePseudoClock(true);
         dac.setUseManualTick(true);
 
-        DefaultAlarmEntityNotifier alarmEntityNotifier = new DefaultAlarmEntityNotifier();
-        alarmEntityNotifier.setAlarmLifecycleListenerManager(alarmLifecycleListenerManager);
+        AlarmEntityNotifierImpl alarmEntityNotifier = new AlarmEntityNotifierImpl();
+        alarmEntityNotifier.onListenerRegistered(alarmLifecycleListenerManager, Collections.emptyMap());
 
         alarmService = new DefaultAlarmService();
         alarmService.setAlarmDao(alarmDao);

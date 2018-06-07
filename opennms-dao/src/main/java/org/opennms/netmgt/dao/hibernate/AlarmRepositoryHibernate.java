@@ -262,7 +262,7 @@ public class AlarmRepositoryHibernate implements AlarmRepository, InitializingBe
             onmsAlarm.getStickyMemo().setAuthor(user);
             onmsAlarm.getStickyMemo().setUpdated(new Date());
             m_alarmDao.saveOrUpdate(onmsAlarm);
-            m_alarmEntityNotifier.didUpdateSticky(onmsAlarm, previousBody, previousAuthor, previousUpdated);
+            m_alarmEntityNotifier.didUpdateStickyMemo(onmsAlarm, previousBody, previousAuthor, previousUpdated);
         }
     }
 
@@ -303,7 +303,7 @@ public class AlarmRepositoryHibernate implements AlarmRepository, InitializingBe
             final OnmsMemo stickyMemo = onmsAlarm.getStickyMemo();
             m_memoDao.delete(onmsAlarm.getStickyMemo());
             onmsAlarm.setStickyMemo(null);
-            m_alarmEntityNotifier.didRemoveStickyMemo(onmsAlarm, stickyMemo);
+            m_alarmEntityNotifier.didDeleteStickyMemo(onmsAlarm, stickyMemo);
         }
     }
 
@@ -318,7 +318,7 @@ public class AlarmRepositoryHibernate implements AlarmRepository, InitializingBe
             final OnmsReductionKeyMemo reductionKeyMemo = onmsAlarm.getReductionKeyMemo();
             m_memoDao.delete(onmsAlarm.getReductionKeyMemo());
             onmsAlarm.setReductionKeyMemo(null);
-            m_alarmEntityNotifier.didRemoveReductionKeyMemo(onmsAlarm, reductionKeyMemo);
+            m_alarmEntityNotifier.didDeleteReductionKeyMemo(onmsAlarm, reductionKeyMemo);
         }
     }
 

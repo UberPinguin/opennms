@@ -12,10 +12,6 @@
   <context:annotation-config />
   <tx:annotation-driven />
 
-  <!-- Alarm notifier bridge -->
-
-  <bean id="defaultAlarmEntityNotifier" class="org.opennms.netmgt.alarmd.DefaultAlarmEntityNotifier" />
-
   <!-- Drools integration -->
 
   <bean id="defaultAlarmTicketer" class="org.opennms.netmgt.alarmd.drools.DefaultAlarmService" />
@@ -41,6 +37,8 @@
 
   <bean id="northbounderManager" class="org.opennms.netmgt.alarmd.NorthbounderManager" />
 
+  <onmsgi:service interface="org.opennms.netmgt.dao.api.AlarmEntityListener" ref="northbounderManager"/>
+
   <onmsgi:list id="northbounderList" interface="org.opennms.netmgt.alarmd.api.Northbounder">
     <onmsgi:listener ref="northbounderManager" bind-method="onNorthbounderRegistered" unbind-method="onNorthbounderUnregistered" />
   </onmsgi:list>
@@ -48,6 +46,8 @@
   <!-- Lifecycle listeners -->
 
   <bean id="alarmLifecycleListenerManager" class="org.opennms.netmgt.alarmd.AlarmLifecycleListenerManager" />
+
+  <onmsgi:service interface="org.opennms.netmgt.dao.api.AlarmEntityListener" ref="alarmLifecycleListenerManager"/>
 
   <onmsgi:service interface="org.opennms.netmgt.alarmd.api.AlarmLifecycleSubscriptionService" ref="alarmLifecycleListenerManager"/>
 

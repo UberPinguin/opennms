@@ -36,37 +36,28 @@ import org.opennms.netmgt.model.OnmsReductionKeyMemo;
 import org.opennms.netmgt.model.OnmsSeverity;
 
 /**
- * This interface provide functions that should be called
- * immediately after changing the alarm entities while maintaining
- * an open transaction.
- *
- * The implementation should in turn notify any interested listeners
- * i.e. northbounders, correlation engines, etc... about the state change.
- *
- * The implementation should be thread safe.
- *
  * @author jwhite
  */
-public interface AlarmEntityNotifier {
+public interface AlarmEntityListener {
 
-    void didCreateAlarm(OnmsAlarm alarm);
+    void onAlarmCreated(OnmsAlarm alarm);
 
-    void didUpdateAlarmWithReducedEvent(OnmsAlarm alarm);
+    void onAlarmUpdatedWithReducedEvent(OnmsAlarm alarm);
 
-    void didAcknowledgeAlarm(OnmsAlarm alarm, String previousAckUser, Date previousAckTime);
+    void onAlarmAcknowledged(OnmsAlarm alarm, String previousAckUser, Date previousAckTime);
 
-    void didUnacknowledgeAlarm(OnmsAlarm alarm, String previousAckUser, Date previousAckTime);
+    void onAlarmUnacknowledged(OnmsAlarm alarm, String previousAckUser, Date previousAckTime);
 
-    void didUpdateAlarmSeverity(OnmsAlarm alarm, OnmsSeverity previousSeverity);
+    void onAlarmSeverityUpdated(OnmsAlarm alarm, OnmsSeverity previousSeverity);
 
-    void didDeleteAlarm(OnmsAlarm alarm);
+    void onAlarmDeleted(OnmsAlarm alarm);
 
-    void didUpdateStickyMemo(OnmsAlarm onmsAlarm, String previousBody, String previousAuthor, Date previousUpdated);
+    void onStickyMemoUpdated(OnmsAlarm alarm, String previousBody, String previousAuthor, Date previousUpdated);
 
-    void didUpdateReductionKeyMemo(OnmsAlarm onmsAlarm, String previousBody, String previousAuthor, Date previousUpdated);
+    void onReductionKeyMemoUpdated(OnmsAlarm alarm, String previousBody, String previousAuthor, Date previousUpdated);
 
-    void didDeleteStickyMemo(OnmsAlarm onmsAlarm, OnmsMemo memo);
+    void onStickyMemoDeleted(OnmsAlarm alarm, OnmsMemo memo);
 
-    void didDeleteReductionKeyMemo(OnmsAlarm onmsAlarm, OnmsReductionKeyMemo memo);
+    void onReductionKeyMemoDeleted(OnmsAlarm alarm, OnmsReductionKeyMemo memo);
 
 }

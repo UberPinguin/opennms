@@ -33,6 +33,8 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Collectors;
@@ -272,7 +274,7 @@ public class AlarmPersisterImpl implements AlarmPersister {
 
     private static OnmsAlarm createNewAlarm(OnmsEvent e, Event event, AlarmDao alarmDao) {
         OnmsAlarm alarm;
-        Set<OnmsAlarm> containedAlarms = getAlarms(event.getParm("alarm-reductionKeys"), alarmDao);
+        Set<OnmsAlarm> containedAlarms = getAlarms(event.getParmCollection(), alarmDao);
         if (containedAlarms == null || containedAlarms.isEmpty()) {
             alarm = new OnmsAlarm();
         } else {
@@ -305,11 +307,19 @@ public class AlarmPersisterImpl implements AlarmPersister {
         return alarm;
     }
     
-    private static Set<OnmsAlarm> getAlarms(Parm reductionKeysParm, AlarmDao alarmDao) {
-        if (reductionKeysParm == null || reductionKeysParm.getValue().getContent() == null) {
+    private static Set<OnmsAlarm> getAlarms(List<Parm> list, AlarmDao alarmDao) {
+        if (list == null || list.isEmpty()) {
             return Collections.emptySet();
         }
-        return Arrays.stream(reductionKeysParm.getValue().getContent().split(",")).map(reductionKey -> alarmDao.findByReductionKey(reductionKey)).collect(Collectors.toSet());
+        Set<String> reductionKeys = list.stream().filter(AlarmPersisterImpl::isRelatedReductionKeyWithContent).map(p -> p.getValue().getContent()).collect(Collectors.toSet());
+        return reductionKeys.stream().map(reductionKey -> alarmDao.findByReductionKey(reductionKey)).filter(Objects::nonNull).collect(Collectors.toSet());
+    }
+
+    private static boolean isRelatedReductionKeyWithContent(Parm param) {
+        return param.getParmName() != null
+                && param.getParmName().equals("related-reductionKey")
+                && param.getValue() != null
+                && param.getValue().getContent() != null;
     }
 
     private static boolean checkEventSanityAndDoWeProcess(final Event event) {

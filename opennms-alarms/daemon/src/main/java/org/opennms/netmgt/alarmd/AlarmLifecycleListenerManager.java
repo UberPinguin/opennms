@@ -31,6 +31,7 @@ package org.opennms.netmgt.alarmd;
 import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -40,7 +41,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
 import org.opennms.netmgt.alarmd.api.AlarmLifecycleListener;
-import org.opennms.netmgt.alarmd.api.AlarmLifecycleSubscriptionService;
 import org.opennms.netmgt.dao.api.AlarmDao;
 import org.opennms.netmgt.dao.api.AlarmEntityListener;
 import org.opennms.netmgt.model.OnmsAlarm;
@@ -54,12 +54,12 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallbackWithoutResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
-public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscriptionService, AlarmEntityListener {
+public class AlarmLifecycleListenerManager implements AlarmEntityListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(AlarmLifecycleListenerManager.class);
 
     private final Set<AlarmLifecycleListener> listeners = new LinkedHashSet<>();
-    private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
     private Timer timer;
 
     @Autowired
@@ -89,7 +89,7 @@ public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscription
         }
     }
     private void doSnapshot() {
-        rwLock.readLock().lock();
+        lock.readLock().lock();
         try {
             if (listeners.size() < 1) {
                 return;
@@ -102,7 +102,7 @@ public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscription
                 }
             });
         } finally {
-            rwLock.readLock().unlock();
+            lock.readLock().unlock();
         }
     }
 
@@ -163,7 +163,7 @@ public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscription
     }
 
     private void forEachListener(Consumer<AlarmLifecycleListener> callback) {
-        rwLock.readLock().lock();
+        lock.readLock().lock();
         try {
             for (AlarmLifecycleListener listener : listeners) {
                 try {
@@ -173,27 +173,27 @@ public class AlarmLifecycleListenerManager implements AlarmLifecycleSubscription
                 }
             }
         } finally {
-            rwLock.readLock().unlock();
+            lock.readLock().unlock();
         }
     }
 
-    @Override
-    public void addAlarmLifecyleListener(AlarmLifecycleListener listener) {
-        rwLock.writeLock().lock();
+    public void onListenerRegistered(final AlarmLifecycleListener listener, final Map<String,String> properties) {
+        lock.writeLock().lock();
         try {
+            LOG.debug("onListenerRegistered: {} with properties: {}", listener, properties);
             listeners.add(listener);
         } finally {
-            rwLock.writeLock().unlock();
+            lock.writeLock().unlock();
         }
     }
 
-    @Override
-    public void removeAlarmLifecycleListener(AlarmLifecycleListener listener) {
-        rwLock.writeLock().lock();
+    public void onListenerUnregistered(final AlarmLifecycleListener listener, final Map<String,String> properties) {
+        lock.writeLock().lock();
         try {
+            LOG.debug("onListenerUnregistered: {} with properties: {}", listener, properties);
             listeners.remove(listener);
         } finally {
-            rwLock.writeLock().unlock();
+            lock.writeLock().unlock();
         }
     }
 

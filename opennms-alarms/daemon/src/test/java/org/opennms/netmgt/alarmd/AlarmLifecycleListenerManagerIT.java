@@ -35,6 +35,7 @@ import static org.opennms.netmgt.alarmd.driver.AlarmMatchers.hasSeverity;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -53,7 +54,6 @@ import org.opennms.core.test.db.MockDatabase;
 import org.opennms.core.test.db.TemporaryDatabaseAware;
 import org.opennms.core.test.db.annotations.JUnitTemporaryDatabase;
 import org.opennms.netmgt.alarmd.api.AlarmLifecycleListener;
-import org.opennms.netmgt.alarmd.api.AlarmLifecycleSubscriptionService;
 import org.opennms.netmgt.dao.api.AlarmDao;
 import org.opennms.netmgt.dao.api.MonitoringLocationDao;
 import org.opennms.netmgt.dao.api.NodeDao;
@@ -113,7 +113,7 @@ public class AlarmLifecycleListenerManagerIT implements TemporaryDatabaseAware<M
     private TransactionTemplate transactionTemplate;
 
     @Autowired
-    private AlarmLifecycleSubscriptionService m_alarmLifecycleSubscriptionService;
+    private AlarmLifecycleListenerManager m_alarmLifecycleListenerManager;
 
     private MockDatabase m_database;
 
@@ -136,7 +136,7 @@ public class AlarmLifecycleListenerManagerIT implements TemporaryDatabaseAware<M
         m_nodeDao.save(node);
 
         // Register!
-        m_alarmLifecycleSubscriptionService.addAlarmLifecyleListener(this);
+        m_alarmLifecycleListenerManager.onListenerRegistered(this, Collections.emptyMap());
 
         // Fire it up
         m_alarmd.start();

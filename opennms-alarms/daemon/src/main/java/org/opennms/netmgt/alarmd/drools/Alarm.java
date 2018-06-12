@@ -26,12 +26,18 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.netmgt.alarmd.api;
+package org.opennms.netmgt.alarmd.drools;
 
-public interface AlarmLifecycleSubscriptionService {
+import java.util.Date;
 
-    void addAlarmLifecyleListener(AlarmLifecycleListener listener);
+import org.opennms.netmgt.model.OnmsAlarm;
 
-    void removeAlarmLifecycleListener(AlarmLifecycleListener listener);
+public class Alarm extends OnmsAlarm {
 
+    public Date getLastUpdateTime() {
+        if (getLastAutomationTime() != null && getLastAutomationTime().compareTo(getLastEventTime()) > 0) {
+            return getLastAutomationTime();
+        }
+        return getLastEventTime();
+    }
 }

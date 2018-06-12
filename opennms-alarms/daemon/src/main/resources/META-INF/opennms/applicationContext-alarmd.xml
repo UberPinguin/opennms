@@ -20,6 +20,8 @@
 
   <bean id="droolsAlarmContext" class="org.opennms.netmgt.alarmd.drools.DroolsAlarmContext" />
 
+  <onmsgi:service interface="org.opennms.netmgt.alarmd.api.AlarmLifecycleListener" ref="droolsAlarmContext"/>
+
   <!-- Daemon -->
 
   <bean id="alarmPersister" class="org.opennms.netmgt.alarmd.AlarmPersisterImpl" />
@@ -49,6 +51,8 @@
 
   <onmsgi:service interface="org.opennms.netmgt.dao.api.AlarmEntityListener" ref="alarmLifecycleListenerManager"/>
 
-  <onmsgi:service interface="org.opennms.netmgt.alarmd.api.AlarmLifecycleSubscriptionService" ref="alarmLifecycleListenerManager"/>
+  <onmsgi:list id="alarmLifecycleListeners" interface="org.opennms.netmgt.alarmd.api.AlarmLifecycleListener">
+    <onmsgi:listener ref="alarmLifecycleListenerManager" bind-method="onListenerRegistered" unbind-method="onListenerUnregistered" />
+  </onmsgi:list>
 
 </beans>

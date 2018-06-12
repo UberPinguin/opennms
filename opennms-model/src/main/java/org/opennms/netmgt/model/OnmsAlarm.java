@@ -1153,5 +1153,13 @@ public class OnmsAlarm implements Acknowledgeable, Serializable {
     public Date getAckTime() {
         return m_alarmAckTime;
     }
-    
+
+    @Transient
+    @XmlTransient
+    public Date getLastUpdateTime() {
+        if (getLastAutomationTime() != null && getLastAutomationTime().compareTo(getLastEventTime()) > 0) {
+            return getLastAutomationTime();
+        }
+        return getLastEventTime();
+    }
 }

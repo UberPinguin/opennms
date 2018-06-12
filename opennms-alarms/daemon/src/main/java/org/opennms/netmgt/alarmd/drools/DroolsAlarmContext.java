@@ -31,7 +31,6 @@ package org.opennms.netmgt.alarmd.drools;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -46,7 +45,6 @@ import org.kie.api.runtime.KieSessionConfiguration;
 import org.kie.api.runtime.conf.ClockTypeOption;
 import org.kie.api.runtime.rule.FactHandle;
 import org.opennms.core.logging.Logging;
-import org.opennms.netmgt.alarmd.AlarmLifecycleListenerManager;
 import org.opennms.netmgt.alarmd.Alarmd;
 import org.opennms.netmgt.alarmd.api.AlarmLifecycleListener;
 import org.opennms.netmgt.model.OnmsAlarm;
@@ -64,9 +62,6 @@ public class DroolsAlarmContext implements AlarmLifecycleListener {
 
     @Autowired
     private AlarmTicketerService alarmTicketerService;
-
-    @Autowired
-    private AlarmLifecycleListenerManager alarmLifecycleListenerManager;
 
     private boolean usePseudoClock = false;
 
@@ -102,7 +97,6 @@ public class DroolsAlarmContext implements AlarmLifecycleListener {
         alarmsById.clear();
 
         kieSession.insert(alarmTicketerService);
-        alarmLifecycleListenerManager.addAlarmLifecyleListener(this);
 
         if (!useManualTick) {
             new Thread(() -> {
@@ -119,7 +113,6 @@ public class DroolsAlarmContext implements AlarmLifecycleListener {
             kieSession.halt();
             kieSession = null;
         }
-        alarmLifecycleListenerManager.removeAlarmLifecycleListener(this);
     }
 
     @Override
@@ -153,9 +146,9 @@ public class DroolsAlarmContext implements AlarmLifecycleListener {
         if (alarmAndFact == null) {
             final FactHandle fact = kieSession.insert(alarm);
             alarmsById.put(alarm.getId(), new AlarmAndFact(alarm, fact));
-        } else if (Objects.equals(alarm.getLastEventTime(), alarmAndFact.getAlarm().getLastEventTime())) {
+        } /*else if (Objects.equals(alarm.getLastEventTime(), alarmAndFact.getAlarm().getLastEventTime())) {
             kieSession.update(alarmAndFact.getFact(), alarm);
-        } else {
+        } */ else {
             // If the time field changes we need to remove and re-insert the object, rather than update it
             // Remove
             kieSession.delete(alarmAndFact.getFact());
@@ -227,7 +220,4 @@ public class DroolsAlarmContext implements AlarmLifecycleListener {
         this.alarmTicketerService = alarmTicketerService;
     }
 
-    public void setAlarmLifecycleListenerManager(AlarmLifecycleListenerManager alarmLifecycleListenerManager) {
-        this.alarmLifecycleListenerManager = alarmLifecycleListenerManager;
-    }
 }

@@ -10,7 +10,7 @@ global org.opennms.netmgt.alarmd.drools.AlarmService alarmService;
 
 declare org.opennms.netmgt.model.OnmsAlarm
     @role(event)
-    @timestamp(lastEventTime)
+    @timestamp(lastUpdateTime)
 end
 
 /*
@@ -32,7 +32,7 @@ end
 rule "cosmicClear"
   when
     $clear : OnmsAlarm(alarmType == 2)
-    $trigger : OnmsAlarm(alarmType == 1, severity.isGreaterThanOrEqual(OnmsSeverity.NORMAL), reductionKey == $clear.clearKey, this before $clear)
+    $trigger : OnmsAlarm(alarmType == 1, severity.isGreaterThanOrEqual(OnmsSeverity.NORMAL), reductionKey == $clear.clearKey, lastEventTime <= $clear.lastEventTime)
   then
     alarmService.clearAlarm($trigger, $clear.getLastEventTime());
 end
@@ -336,7 +336,7 @@ rule "updateTickets"
     $ticketer : AlarmTicketerService(isTicketingEnabled() == true)
     $alarm : OnmsAlarm(severity.isGreaterThan(OnmsSeverity.CLEARED) &&
                        (alarmType == 1 || alarmType == 3) &&
-                       TTicketState != null)
+                       TTicketState != null )
     not( OnmsAlarm( this == $alarm ) over window:time( 15m ) )
   then
     $ticketer.updateTicket($alarm);
@@ -376,7 +376,7 @@ rule "closeClearedAlarmTickets"
     $alarm : OnmsAlarm(severity == OnmsSeverity.CLEARED &&
                        alarmType == 1 &&
                        TTicketState == TroubleTicketState.OPEN)
-     // FIXME: not( OnmsAlarm( this == $alarm ) over window:time( 15m ) )
+    not( OnmsAlarm( this == $alarm ) over window:time( 15m ) )
   then
     $ticketer.closeTicket($alarm);
 end

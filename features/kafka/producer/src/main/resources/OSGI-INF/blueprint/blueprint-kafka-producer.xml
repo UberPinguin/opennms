@@ -56,7 +56,7 @@
     <property name="alarmFilter" value="${alarmFilter}"/>
   </bean>
 
-  <service ref="alarmDataSync" interface="org.opennms.features.kafka.producer.datasync.AlarmDataStore" />
+  <service ref="kafkaProducer" interface="org.opennms.netmgt.alarmd.api.AlarmLifecycleListener" />
 
   <bean id="alarmDataSync" class="org.opennms.features.kafka.producer.datasync.KafkaAlarmDataSync"
 		init-method="init" destroy-method="destroy">
@@ -68,5 +68,7 @@
     <property name="alarmTopic" value="${alarmTopic}"/>
     <property name="alarmSyncIntervalMs" value="${alarmSyncIntervalMs}"/>
   </bean>
+
+  <service ref="alarmDataSync" interface="org.opennms.features.kafka.producer.datasync.AlarmDataStore" />
 
 </blueprint>

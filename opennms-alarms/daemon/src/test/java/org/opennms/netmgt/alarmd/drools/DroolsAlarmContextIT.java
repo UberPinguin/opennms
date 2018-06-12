@@ -39,7 +39,6 @@ import static org.mockito.Mockito.when;
 import static org.opennms.netmgt.alarmd.driver.AlarmMatchers.hasSeverity;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,11 +48,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
-import org.opennms.netmgt.alarmd.AlarmLifecycleListenerManager;
 import org.opennms.netmgt.dao.api.AlarmDao;
 import org.opennms.netmgt.dao.support.AlarmEntityNotifierImpl;
-import org.opennms.netmgt.events.api.EventForwarder;
 import org.opennms.netmgt.model.OnmsAlarm;
 import org.opennms.netmgt.model.OnmsEvent;
 import org.opennms.netmgt.model.OnmsSeverity;
@@ -68,29 +66,20 @@ public class DroolsAlarmContextIT {
 
     private DroolsAlarmContext dac;
     private AlarmDao alarmDao;
-    private EventForwarder eventForwarder;
-    private AlarmLifecycleListenerManager alarmLifecycleListenerManager;
-    private DefaultAlarmService alarmService;
     private MockTicketer ticketer = new MockTicketer();
 
     @Before
     public void setUp() {
-        alarmDao = mock(AlarmDao.class);
-        eventForwarder = mock(EventForwarder.class);
-        alarmLifecycleListenerManager = mock(AlarmLifecycleListenerManager.class);
         dac = new DroolsAlarmContext();
-
-        dac.setAlarmTicketerService(ticketer);
-        dac.setAlarmLifecycleListenerManager(alarmLifecycleListenerManager);
-
         dac.setUsePseudoClock(true);
         dac.setUseManualTick(true);
+        dac.setAlarmTicketerService(ticketer);
 
-        AlarmEntityNotifierImpl alarmEntityNotifier = new AlarmEntityNotifierImpl();
-        alarmEntityNotifier.onListenerRegistered(alarmLifecycleListenerManager, Collections.emptyMap());
-
-        alarmService = new DefaultAlarmService();
+        DefaultAlarmService alarmService = new DefaultAlarmService();
+        alarmDao = mock(AlarmDao.class);
         alarmService.setAlarmDao(alarmDao);
+
+        AlarmEntityNotifierImpl alarmEntityNotifier = mock(AlarmEntityNotifierImpl.class);
         alarmService.setAlarmEntityNotifier(alarmEntityNotifier);
         dac.setAlarmService(alarmService);
 
@@ -374,7 +363,7 @@ public class DroolsAlarmContextIT {
         dac.tick();
 
         // No ticket yet
-        assertThat(ticketer.getCreates(), hasSize(0));
+        assertThat(ticketer.didCreatedTicketFor(trigger), equalTo(false));
         assertThat(ticketer.getNumUpdatesFor(trigger), equalTo(0));
 
         // Advance the clock and tick
@@ -382,24 +371,23 @@ public class DroolsAlarmContextIT {
         dac.tick();
 
         // Ticket, but no update yet
-        assertThat(ticketer.getCreates(), hasSize(1));
+        assertThat(ticketer.didCreatedTicketFor(trigger), equalTo(true));
         assertThat(ticketer.getNumUpdatesFor(trigger), equalTo(0));
 
-        /*
         // Advance the clock and tick
         dac.getClock().advanceTime( 60, TimeUnit.MINUTES );
         dac.tick();
         assertThat(ticketer.getNumUpdatesFor(trigger), equalTo(1));
 
         // Advance the clock and tick
-        alm.getClock().advanceTime( 20, TimeUnit.MINUTES );
-        alm.tick();
+        dac.getClock().advanceTime( 20, TimeUnit.MINUTES );
+        dac.tick();
         assertThat(ticketer.getNumUpdatesFor(trigger), equalTo(2));
-        */
     }
 
     @Test
-    public void canClose() {
+    @Ignore("Need real service layer")
+    public void canCloseTicket() {
         ticketer.setEnabled(true);
 
         // Trigger some problem
@@ -420,14 +408,8 @@ public class DroolsAlarmContextIT {
         // Advance the clock and tick
         dac.getClock().advanceTime( 20, TimeUnit.MINUTES );
         dac.tick();
-
-        // Ticket!
+        // Verify that there is another
         assertThat(ticketer.getCreates(), contains(trigger.getId()));
-
-        // "Open" the ticket
-        trigger.setTTicketState(TroubleTicketState.OPEN);
-        dac.handleNewOrUpdatedAlarm(trigger);
-        dac.tick();
 
         // Inject a clear
         OnmsAlarm clear = new OnmsAlarm();
@@ -446,12 +428,7 @@ public class DroolsAlarmContextIT {
         // Advance the clock and tick
         dac.getClock().advanceTime( 20, TimeUnit.MINUTES );
         dac.tick();
-
-        /*
-        // FIXME:
-        // Ticket closed!
-        assertThat(ticketer.getCloses(), contains(trigger.getId()));
-        */
+        assertThat(ticketer.didCloseTicketFor(trigger), equalTo(true));
     }
 
     @Test
@@ -476,8 +453,7 @@ public class DroolsAlarmContextIT {
         assertThat(trigger, hasSeverity(OnmsSeverity.CLEARED));
     }
 
-
-    private static class MockTicketer implements AlarmTicketerService {
+    private class MockTicketer implements AlarmTicketerService {
         private boolean enabled = false;
         private List<Integer> creates = new ArrayList<>();
         private List<Integer> closes = new ArrayList<>();
@@ -495,17 +471,34 @@ public class DroolsAlarmContextIT {
 
         @Override
         public void ackAlarmAndCreateTicket(OnmsAlarm alarm) {
+            final Date now = new Date(dac.getClock().getCurrentTime());
+            // Ack
+            alarm.setAlarmAckUser("test");
+            alarm.setAlarmAckTime(now);
+            // Create ticket
+            alarm.setTTicketState(TroubleTicketState.OPEN);
+            alarm.setTTicketId("test");
+            // Update the lastAutomationTime
+            alarm.setLastAutomationTime(now);
             creates.add(alarm.getId());
+            dac.handleNewOrUpdatedAlarm(alarm);
         }
 
         @Override
         public void updateTicket(OnmsAlarm alarm) {
+            final Date now = new Date(dac.getClock().getCurrentTime());
+            // Update the lastAutomationTime
+            alarm.setLastAutomationTime(now);
             updates.compute(alarm.getId(), (k, v) -> (v == null) ? 1 : v + 1);
+            dac.handleNewOrUpdatedAlarm(alarm);
         }
 
         @Override
         public void closeTicket(OnmsAlarm alarm) {
+            // Close ticket
+            alarm.setTTicketState(TroubleTicketState.CLOSED);
             closes.add(alarm.getId());
+            dac.handleNewOrUpdatedAlarm(alarm);
         }
 
         public List<Integer> getCreates() {
@@ -518,6 +511,14 @@ public class DroolsAlarmContextIT {
 
         public int getNumUpdatesFor(OnmsAlarm alarm) {
             return updates.computeIfAbsent(alarm.getId(), k -> 0);
+        }
+
+        public boolean didCreatedTicketFor(OnmsAlarm alarm) {
+            return creates.contains(alarm.getId());
+        }
+
+        public boolean didCloseTicketFor(OnmsAlarm alarm) {
+            return closes.contains(alarm.getId());
         }
     }
 }

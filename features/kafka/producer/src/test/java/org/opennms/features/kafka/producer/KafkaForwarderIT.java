@@ -43,6 +43,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Hashtable;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -174,8 +175,7 @@ public class KafkaForwarderIT implements TemporaryDatabaseAware<MockDatabase> {
         when(configAdmin.getConfiguration(OpennmsKafkaProducer.KAFKA_CLIENT_PID).getProperties()).thenReturn(producerConfig);
         when(configAdmin.getConfiguration(KafkaAlarmDataSync.KAFKA_STREAMS_PID).getProperties()).thenReturn(streamsConfig);
 
-        kafkaProducer = new OpennmsKafkaProducer(protobufMapper, nodeCache, configAdmin, eventdIpcMgr,
-                alarmLifecycleListenerManager);
+        kafkaProducer = new OpennmsKafkaProducer(protobufMapper, nodeCache, configAdmin, eventdIpcMgr);
         kafkaProducer.setEventTopic(EVENT_TOPIC_NAME);
         // Don't forward newSuspect events
         kafkaProducer.setEventFilter("!getUei().equals(\"" + EventConstants.NEW_SUSPECT_INTERFACE_EVENT_UEI + "\")");
@@ -184,6 +184,8 @@ public class KafkaForwarderIT implements TemporaryDatabaseAware<MockDatabase> {
         kafkaProducer.setAlarmFilter(null);
         kafkaProducer.setNodeTopic(NODE_TOPIC_NAME);
         kafkaProducer.init();
+
+        alarmLifecycleListenerManager.onListenerRegistered(kafkaProducer, Collections.emptyMap());
 
         kafkaAlarmaDataStore = new KafkaAlarmDataSync(configAdmin, kafkaProducer, alarmDao, protobufMapper,
                 transactionTemplate);

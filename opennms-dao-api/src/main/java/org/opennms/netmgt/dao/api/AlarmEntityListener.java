@@ -36,6 +36,8 @@ import org.opennms.netmgt.model.OnmsReductionKeyMemo;
 import org.opennms.netmgt.model.OnmsSeverity;
 
 /**
+ * Used to get callbacks when alarm entities are created, updated and/or deleted.
+ *
  * @author jwhite
  */
 public interface AlarmEntityListener {

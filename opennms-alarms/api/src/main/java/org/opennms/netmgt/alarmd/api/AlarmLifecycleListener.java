@@ -32,6 +32,12 @@ import java.util.List;
 
 import org.opennms.netmgt.model.OnmsAlarm;
 
+/**
+ * A simplified version of the {@link org.opennms.netmgt.dao.api.AlarmEntityListener} interface with support
+ * for periodic snapshots.
+ *
+ * @author jwhite
+ */
 public interface AlarmLifecycleListener {
 
     void handleAlarmSnapshot(List<OnmsAlarm> alarms);

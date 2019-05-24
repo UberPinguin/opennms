@@ -54,18 +54,14 @@ public class SupportPageIT extends OpenNMSSeleniumTestCase {
         final String[] links = new String[] {
                 "the OpenNMS.com support page",
                 "About the OpenNMS Web Console",
-                "Release Notes",
+                "Online Documentation and Release Notes",
                 // Online docs links
                 "Installation Guide",
                 "Users Guide",
-                "Administrators Guide",
-                "Developers Guide",
                 "Online Wiki Documentation",
                 // Offline docs links
                 "Installation Guide",
                 "Users Guide",
-                "Administrators Guide",
-                "Developers Guide",
                 "Online Wiki Documentation",
                 "Generate a System Report",
                 "Open a Bug or Enhancement Request",
